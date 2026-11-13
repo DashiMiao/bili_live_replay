@@ -320,13 +320,43 @@ def ensure_aria2c():
     local = cache_bin / exe
     if local.exists():
         return str(local)
-    # 自动下载（目前仅 Windows 有官方静态包；Linux/macOS 建议用包管理器）
-    if is_win:
+    # 自动下载（Windows 用官方包、macOS 用第三方静态包；Linux 建议用包管理器）
+    if is_win or sys.platform == "darwin":
         info("未检测到 aria2c，尝试自动下载...")
-        if _download_aria2c_windows(cache_bin) and local.exists():
+        if _fetch_aria2c_binary(cache_bin) and local.exists():
             return str(local)
         warn("aria2c 自动下载失败，改用 Python 多线程下载")
     return None
+
+
+def _fetch_aria2c_binary(cache_bin: Path) -> bool:
+    """按平台自动下载 aria2c 到 cache_bin（Windows 官方包 / macOS 第三方静态包）。"""
+    cache_bin.mkdir(parents=True, exist_ok=True)
+    system = sys.platform
+    machine = platform.machine().lower()
+    try:
+        if system == "win32":
+            return _download_aria2c_windows(cache_bin)
+        if system == "darwin":
+            arch = "arm64" if machine in ("aarch64", "arm64") else "x86_64"
+            url = (f"https://github.com/AEPKILL/aria2c-binary/releases/download/"
+                   f"release-{ARIA2C_VERSION}/aria2-macos-{arch}.tar.gz")
+            tarball = cache_bin / "aria2.tar.gz"
+            if not _download_file(url, tarball):
+                return False
+            with tarfile.open(tarball, "r:gz") as tf:
+                for m in tf.getmembers():
+                    if m.isfile() and os.path.basename(m.name) == "aria2c":
+                        src = tf.extractfile(m)
+                        with open(cache_bin / "aria2c", "wb") as dst:
+                            shutil.copyfileobj(src, dst)
+                        os.chmod(cache_bin / "aria2c", 0o755)
+                        break
+            tarball.unlink(missing_ok=True)
+            return (cache_bin / "aria2c").exists()
+    except Exception as e:
+        warn(f"aria2c 自动下载失败: {e}")
+    return False
 
 
 def _download_aria2c_windows(cache_bin: Path) -> bool:
@@ -351,6 +381,20 @@ def _download_aria2c_windows(cache_bin: Path) -> bool:
     return (cache_bin / "aria2c.exe").exists()
 
 
+def _print_progress(done: int, total: int, speed: float, elapsed: float):
+    pct = done * 100.0 / total if total else 0.0
+    mm = int(elapsed) // 60
+    ss = int(elapsed) % 60
+    sys.stdout.write(f"\r  下载中 {done}/{total} ({pct:.1f}%)  "
+                     f"{speed / 1048576:.1f} MB/s  耗时 {mm:02d}:{ss:02d}    ")
+    sys.stdout.flush()
+
+
+def _scan_dir(outdir: Path):
+    segs = list(outdir.glob("seg_*.m4s"))
+    return len(segs), sum(s.stat().st_size for s in segs)
+
+
 def _download_aria2c(urls: list, outdir: Path, referer: str, aria2c: str) -> bool:
     inp = outdir / "aria_input.txt"
     with open(inp, "w", encoding="utf-8") as f:
@@ -366,19 +410,38 @@ def _download_aria2c(urls: list, outdir: Path, referer: str, aria2c: str) -> boo
            "--console-log-level=warn", "--summary-interval=10",
            "--user-agent", UA, "--referer", referer]
     logfile = outdir / "aria2c.log"
+    total = len(urls)
     with open(logfile, "w", encoding="utf-8") as f:
         p = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT)
+    t0 = time.time()
+    last_bytes = 0
+    last_t = t0
+    try:
+        while p.poll() is None:
+            done, cur_bytes = _scan_dir(outdir)
+            now = time.time()
+            dt = now - last_t
+            if dt >= 1.0:
+                speed = (cur_bytes - last_bytes) / dt if dt > 0 else 0.0
+                last_bytes = cur_bytes
+                last_t = now
+                _print_progress(done, total, speed, now - t0)
+            time.sleep(0.5)
+    except KeyboardInterrupt:
+        # 用户按了 Ctrl+C：先结束 aria2c 子进程再抛出，交给顶层处理
+        p.terminate()
         try:
-            rc = p.wait()
-        except KeyboardInterrupt:
-            # 用户按了 Ctrl+C：先结束 aria2c 子进程再抛出，交给顶层处理
-            p.terminate()
-            try:
-                p.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                p.kill()
-            raise
-    return rc == 0
+            p.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            p.kill()
+        sys.stdout.write("\n")
+        sys.stdout.flush()
+        raise
+    done, _ = _scan_dir(outdir)
+    _print_progress(done, total, 0.0, time.time() - t0)
+    sys.stdout.write("\n")
+    sys.stdout.flush()
+    return p.returncode == 0
 
 
 def _download_one(args):
@@ -399,17 +462,34 @@ def _download_py(urls: list, outdir: Path, headers) -> bool:
     tasks = []
     for i, u in enumerate(urls, 1):
         tasks.append((u, outdir / f"seg_{i:05d}.m4s", headers))
+    total = len(tasks)
     ok = 0
+    t0 = time.time()
+    last_bytes = 0
+    last_t = t0
     with ThreadPoolExecutor(max_workers=32) as ex:
         futures = [ex.submit(_download_one, t) for t in tasks]
         try:
             for fut in as_completed(futures):
                 ok += 1 if fut.result() else 0
+                now = time.time()
+                dt = now - last_t
+                if dt >= 1.0:
+                    done, cur_bytes = _scan_dir(outdir)
+                    speed = (cur_bytes - last_bytes) / dt if dt > 0 else 0.0
+                    last_bytes = cur_bytes
+                    last_t = now
+                    _print_progress(ok, total, speed, now - t0)
         except KeyboardInterrupt:
             for fut in futures:
                 fut.cancel()
             ex.shutdown(wait=False, cancel_futures=True)
+            sys.stdout.write("\n")
+            sys.stdout.flush()
             raise
+    _print_progress(ok, total, 0.0, time.time() - t0)
+    sys.stdout.write("\n")
+    sys.stdout.flush()
     return ok == len(urls)
 
 
@@ -754,7 +834,7 @@ def process_replay(replay, uid, date_str, prefix, headers, referer,
     slices = get_slices(replay, uid, headers)
     if not slices or not slices["list"]:
         warn("未获取到切片视频流（可能回放尚未合成完成），跳过")
-        return
+        return False
 
     n_slice = len(slices["list"])
     if n_slice > 1:
@@ -791,7 +871,7 @@ def process_replay(replay, uid, date_str, prefix, headers, referer,
 
     if not slice_mp4s:
         warn("没有可用的视频段，跳过")
-        return
+        return False
 
     # 拼接（多段时）
     if len(slice_mp4s) == 1:
@@ -807,7 +887,7 @@ def process_replay(replay, uid, date_str, prefix, headers, referer,
     log(f"  切分为每 {part_seconds // 60} 分钟一个片段...")
     if not split_mp4(ffmpeg, env, combined, prefix, outdir, part_seconds):
         warn("切分失败")
-        return
+        return False
 
     # 列出产物
     parts = sorted(outdir.glob(f"{prefix}_part*.mp4"))
@@ -830,6 +910,8 @@ def process_replay(replay, uid, date_str, prefix, headers, referer,
             log(f"  {'=' * 40}")
         else:
             log("  检测到断流，但未获取到具体原因信息。")
+
+    return True
 
 
 def main():
@@ -917,15 +999,35 @@ def main():
     workdir = WORK_DIR
     workdir.mkdir(parents=True, exist_ok=True)
 
+    t_start = time.time()
+    success_count = 0
+    total_video_sec = 0
     for r, d, prefix in to_process:
         day_work = workdir / prefix
         if day_work.exists():
             shutil.rmtree(day_work)
         day_work.mkdir(parents=True, exist_ok=True)
-        process_replay(r, uid, d, prefix, headers, referer, ffmpeg, ffprobe, env,
-                       outdir, day_work, args.part_seconds)
+        ok = process_replay(r, uid, d, prefix, headers, referer, ffmpeg, ffprobe, env,
+                            outdir, day_work, args.part_seconds)
         if not args.keep_temp:
             shutil.rmtree(day_work, ignore_errors=True)
+        if ok:
+            success_count += 1
+            dur = (r.get("video_info") or {}).get("duration")
+            if not dur:
+                dur = r["end_time"] - r["start_time"]
+            total_video_sec += int(dur)
+
+    # 总时长汇总
+    elapsed = time.time() - t_start
+    vh, vm = total_video_sec // 3600, (total_video_sec % 3600) // 60
+    eh, em, es = int(elapsed) // 3600, (int(elapsed) % 3600) // 60, int(elapsed) % 60
+    log(f"\n{'=' * 40}")
+    log("  下载汇总：")
+    log(f"    成功下载: {success_count} 场回放")
+    log(f"    视频总时长: {vh} 时 {vm} 分")
+    log(f"    总耗时: {eh} 时 {em} 分 {es} 秒" if eh else f"    总耗时: {em} 分 {es} 秒")
+    log(f"{'=' * 40}")
 
     log("\n全部完成 ✅")
 
