@@ -566,21 +566,22 @@ def _download_file(url: str, dest: Path) -> bool:
 
 
 def _download_binary(url: str, dest: Path) -> bool:
-    """下载单个二进制文件：优先用 aria2c（多连接更快），否则回退 requests 单线程。"""
+    """下载单个二进制文件：优先 aria2c（多连接），失败自动回退 requests 单线程。"""
     aria2c = ensure_aria2c()
     if aria2c:
         dest.parent.mkdir(parents=True, exist_ok=True)
-        cmd = [aria2c, "-x", "16", "-s", "16",
-               "-d", str(dest.parent), "-o", dest.name,
-               "--allow-overwrite=true", "--max-tries=5", "--timeout=30",
-               "--user-agent", UA, url]
-        try:
-            r = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            if r.returncode == 0 and dest.exists():
-                return True
-        except Exception:
-            pass
-        warn("aria2c 下载失败，改用 requests 单线程下载")
+        # 依次尝试：4 连接 → 单连接+跳过证书校验（解决 Windows 下 aria2c 多连接/SSL 偶发失败）
+        for extra in (["-x", "4", "-s", "4"], ["-x", "1", "--check-certificate=false"]):
+            cmd = [aria2c, *extra, "-d", str(dest.parent), "-o", dest.name,
+                   "--allow-overwrite=true", "--max-tries=3", "--timeout=30",
+                   "--user-agent", UA, url]
+            try:
+                r = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                if r.returncode == 0 and dest.exists():
+                    return True
+            except Exception:
+                pass
+        warn("aria2c 下载该文件失败，已自动改用单线程下载（不影响运行，仅稍慢）")
     return _download_file(url, dest)
 
 
