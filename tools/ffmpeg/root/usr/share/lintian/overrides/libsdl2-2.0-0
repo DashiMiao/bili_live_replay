@@ -1,0 +1,7 @@
+# The actual shared library is in libsdl2-classic
+libsdl2-2.0-0: empty-shared-library-symbols [symbols]
+libsdl2-2.0-0: empty-shlibs [shlibs]
+libsdl2-2.0-0: ldconfig-escape usr/lib/*/sdl2-classic/libSDL2-2.0.so.0 [usr/lib/*/libSDL2-2.0.so.0]
+libsdl2-2.0-0: ldconfig-escape usr/lib/*/sdl2-classic/libSDL2-2.0.so.0.* [usr/lib/*/libSDL2-2.0.so.0.*]
+libsdl2-2.0-0: package-has-unnecessary-activation-of-ldconfig-trigger
+libsdl2-2.0-0: surplus-shared-library-symbols libSDL2-2.0 0 [symbols]

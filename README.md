@@ -36,7 +36,7 @@ python3 build.py
 | aria2c（可选） | `sudo apt install aria2` | `brew install aria2` | `winget install aria2` |
 
 > **ffmpeg 自动下载**：脚本会在系统里找不到 ffmpeg 时，按平台自动下载静态 ffmpeg 到「程序同目录下的 `tools/`」（Linux 用 apt 源、失败回退 johnvansickle；macOS 用 evermeet.cx；Windows 用 gyan.dev）。下载优先用 aria2c 多连接加速，没有 aria2c 时用 requests 单线程并显示进度。
-> **aria2c 自动下载**：Windows 上找不到 aria2c 时会自动从 GitHub 下载 aria2c.exe 到 `tools/`；下载失败或 Linux/macOS 上找不到时，自动回退为 Python 多线程下载（慢一点，但能用）。
+> **aria2c 自动下载**：Windows / macOS 上找不到 aria2c 时会自动下载静态 aria2c 到 `tools/`（Windows 用官方包，macOS 用第三方静态包 `AEPKILL/aria2c-binary`，自动区分 Intel / Apple Silicon）；下载失败或 Linux 上找不到时，自动回退为 Python 多线程下载（慢一点，但能用）。
 > 下载的工具二进制都放在程序旁边的 `tools/` 目录里，方便连同程序一起拷贝到别的机器。
 
 ## 用法
