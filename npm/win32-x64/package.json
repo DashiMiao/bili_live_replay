@@ -1,5 +1,5 @@
 {
-  "name": "@yourscope/bili_live_replay-win32-x64",
+  "name": "@miaodashi/bili_live_replay-win32-x64",
   "version": "1.0.0",
   "description": "bili_live_replay 预编译二进制（Windows x64）",
   "main": "index.js",
@@ -13,6 +13,10 @@
   "cpu": [
     "x64"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DashiMiao/bili_live_replay.git"
+  },
   "license": "MIT",
   "publishConfig": {
     "access": "public"

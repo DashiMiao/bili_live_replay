@@ -10,5 +10,9 @@ dist/
 node_modules/
 npm-debug.log*
 
-# npm 平台包里的预编译二进制由 CI 生成，不提交到 git
-npm/*/bin/
+# npm 平台包里的预编译二进制由 CI 生成，不提交到 git。
+# 不能忽略 npm/bili_live_replay/bin/，其中的 JS 文件是主包 CLI 入口。
+npm/linux-x64/bin/
+npm/darwin-x64/bin/
+npm/darwin-arm64/bin/
+npm/win32-x64/bin/

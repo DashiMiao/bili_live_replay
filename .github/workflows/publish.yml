@@ -14,23 +14,25 @@ on:
 jobs:
   # 1) 在各平台用 PyInstaller 编译出原生二进制，作为 artifact 暂存
   build:
+    permissions:
+      contents: read
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
             pkg: linux-x64
-          - os: macos-13
+          - os: macos-15-intel
             pkg: darwin-x64
-          - os: macos-latest
+          - os: macos-15
             pkg: darwin-arm64
           - os: windows-latest
             pkg: win32-x64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
@@ -57,8 +59,11 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: 下载所有平台二进制
         uses: actions/download-artifact@v4
@@ -80,22 +85,63 @@ jobs:
                    npm/darwin-x64/bin/bili_live_replay \
                    npm/darwin-arm64/bin/bili_live_replay
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
+          package-manager-cache: false
 
-      - name: 发布到 npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: 同步所有 npm 包版本
+        shell: bash
         run: |
           set -euo pipefail
           VERSION="${{ github.event.inputs.version }}"
           if [ -z "$VERSION" ]; then
             VERSION="${GITHUB_REF_NAME#v}"
           fi
-          echo "发布版本: $VERSION"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "无效的版本号: $VERSION"
+            exit 1
+          fi
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           for pkg in linux-x64 darwin-x64 darwin-arm64 win32-x64; do
-            ( cd "npm/$pkg" && npm pkg set version="$VERSION" && npm publish --access public )
+            npm pkg set --prefix "npm/$pkg" version="$VERSION"
           done
-          ( cd "npm/bili_live_replay" && npm pkg set version="$VERSION" && npm publish --access public )
+          npm pkg set --prefix npm/bili_live_replay version="$VERSION" \
+            "optionalDependencies.@miaodashi/bili_live_replay-linux-x64=$VERSION" \
+            "optionalDependencies.@miaodashi/bili_live_replay-darwin-x64=$VERSION" \
+            "optionalDependencies.@miaodashi/bili_live_replay-darwin-arm64=$VERSION" \
+            "optionalDependencies.@miaodashi/bili_live_replay-win32-x64=$VERSION"
+          cp README.md npm/bili_live_replay/README.md
+
+      - name: 检查待发布内容
+        shell: bash
+        run: |
+          set -euo pipefail
+          for pkg in linux-x64 darwin-x64 darwin-arm64 win32-x64 bili_live_replay; do
+            ( cd "npm/$pkg" && npm pack --dry-run )
+          done
+
+      - name: 发布到 npm
+        env:
+          # 仅首次创建这 5 个包时需要 NPM_TOKEN；之后由 npm Trusted Publishing/OIDC 认证。
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "发布版本: $VERSION"
+
+          publish_if_missing() {
+            local dir="$1"
+            local name="$2"
+            if npm view "$name@$VERSION" version >/dev/null 2>&1; then
+              echo "$name@$VERSION 已存在，跳过"
+            else
+              ( cd "$dir" && npm publish --access public )
+            fi
+          }
+
+          for pkg in linux-x64 darwin-x64 darwin-arm64 win32-x64; do
+            publish_if_missing "npm/$pkg" "@miaodashi/bili_live_replay-$pkg"
+          done
+          publish_if_missing "npm/bili_live_replay" "@miaodashi/bili_live_replay"
