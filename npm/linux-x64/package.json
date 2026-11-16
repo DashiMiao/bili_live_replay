@@ -1,0 +1,20 @@
+{
+  "name": "@yourscope/bili_live_replay-linux-x64",
+  "version": "1.0.0",
+  "description": "bili_live_replay 预编译二进制（Linux x64）",
+  "main": "index.js",
+  "files": [
+    "index.js",
+    "bin"
+  ],
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  }
+}
