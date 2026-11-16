@@ -1,0 +1,101 @@
+name: publish
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "要发布的版本号（例如 1.0.0）"
+        required: true
+        default: "1.0.0"
+
+jobs:
+  # 1) 在各平台用 PyInstaller 编译出原生二进制，作为 artifact 暂存
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            pkg: linux-x64
+          - os: macos-13
+            pkg: darwin-x64
+          - os: macos-latest
+            pkg: darwin-arm64
+          - os: windows-latest
+            pkg: win32-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 编译二进制
+        run: python build.py
+
+      - name: 暂存二进制（带平台后缀，避免重名）
+        shell: bash
+        run: |
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            cp dist/bili_live_replay.exe "bili_live_replay-${{ matrix.pkg }}.exe"
+          else
+            cp dist/bili_live_replay "bili_live_replay-${{ matrix.pkg }}"
+          fi
+
+      - name: 上传 artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bin-${{ matrix.pkg }}
+          path: bili_live_replay-${{ matrix.pkg }}*
+          if-no-files-found: error
+
+  # 2) 汇总各平台二进制，写进 npm 平台包，统一发布
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 下载所有平台二进制
+        uses: actions/download-artifact@v4
+        with:
+          pattern: bin-*
+          merge-multiple: true
+          path: .binaries
+
+      - name: 归位二进制到各平台包
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p npm/linux-x64/bin npm/darwin-x64/bin npm/darwin-arm64/bin npm/win32-x64/bin
+          cp .binaries/bili_live_replay-linux-x64    npm/linux-x64/bin/bili_live_replay
+          cp .binaries/bili_live_replay-darwin-x64   npm/darwin-x64/bin/bili_live_replay
+          cp .binaries/bili_live_replay-darwin-arm64 npm/darwin-arm64/bin/bili_live_replay
+          cp .binaries/bili_live_replay-win32-x64    npm/win32-x64/bin/bili_live_replay.exe
+          chmod +x npm/linux-x64/bin/bili_live_replay \
+                   npm/darwin-x64/bin/bili_live_replay \
+                   npm/darwin-arm64/bin/bili_live_replay
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: 发布到 npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "发布版本: $VERSION"
+          for pkg in linux-x64 darwin-x64 darwin-arm64 win32-x64; do
+            ( cd "npm/$pkg" && npm pkg set version="$VERSION" && npm publish --access public )
+          done
+          ( cd "npm/bili_live_replay" && npm pkg set version="$VERSION" && npm publish --access public )
