@@ -1,5 +1,5 @@
 {
-  "name": "@yourscope/bili_live_replay",
+  "name": "@miaodashi/bili_live_replay",
   "version": "1.0.0",
   "description": "bilibili 直播回放下载工具（跨平台 CLI，npm 版）",
   "bin": {
@@ -9,10 +9,18 @@
     "bin"
   ],
   "optionalDependencies": {
-    "@yourscope/bili_live_replay-linux-x64": "1.0.0",
-    "@yourscope/bili_live_replay-darwin-x64": "1.0.0",
-    "@yourscope/bili_live_replay-darwin-arm64": "1.0.0",
-    "@yourscope/bili_live_replay-win32-x64": "1.0.0"
+    "@miaodashi/bili_live_replay-linux-x64": "1.0.0",
+    "@miaodashi/bili_live_replay-darwin-x64": "1.0.0",
+    "@miaodashi/bili_live_replay-darwin-arm64": "1.0.0",
+    "@miaodashi/bili_live_replay-win32-x64": "1.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DashiMiao/bili_live_replay.git"
+  },
+  "homepage": "https://github.com/DashiMiao/bili_live_replay#readme",
+  "bugs": {
+    "url": "https://github.com/DashiMiao/bili_live_replay/issues"
   },
   "license": "MIT",
   "engines": {
