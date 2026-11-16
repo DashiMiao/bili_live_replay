@@ -19,6 +19,15 @@ import sys
 import venv
 from pathlib import Path
 
+# Windows CI（如 GitHub Actions）默认用 cp1252 输出，打印中文会抛 UnicodeEncodeError，
+# 这里强制把标准输出/错误切换为 UTF-8，保证各平台都能正常打印中文。
+for _stream in (sys.stdout, sys.stderr):
+    if _stream is not None and hasattr(_stream, "reconfigure"):
+        try:
+            _stream.reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            pass
+
 BASE = Path(__file__).resolve().parent
 VENV = BASE / ".build_venv"
 

@@ -37,6 +37,10 @@ jobs:
           python-version: "3.12"
 
       - name: 编译二进制
+        env:
+          # 让 Python（含 PyInstaller 子进程）统一用 UTF-8，避免 Windows 下 cp1252 编码报错
+          PYTHONUTF8: "1"
+          PYTHONIOENCODING: "utf-8"
         run: python build.py
 
       - name: 暂存二进制（带平台后缀，避免重名）
