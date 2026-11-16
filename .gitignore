@@ -1,0 +1,14 @@
+# Python 构建产物
+__pycache__/
+*.pyc
+.build_venv/
+build/
+dist/
+*.spec
+
+# Node / npm
+node_modules/
+npm-debug.log*
+
+# npm 平台包里的预编译二进制由 CI 生成，不提交到 git
+npm/*/bin/
