@@ -1,0 +1,1 @@
+# 占位 .npmignore：阻止 npm 回退使用 .gitignore，包含关系由 package.json 的 files 字段控制

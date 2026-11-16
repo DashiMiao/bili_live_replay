@@ -111,3 +111,33 @@ bili_live_replay --room-id 9308312 --cookie-file cookie.txt --recent 3
 - 接口最多返回近 14 天的回放。
 - 下载过程中按 `Ctrl+C` 可立即中断（会自动结束 aria2c 子进程并清理临时文件）。
 - 默认直连下载（绕过系统代理）；若开了代理/梯子导致问题，默认已不受影响，如确需走代理用 `--proxy` 指定。
+
+## 发布到 npm
+
+通过 GitHub Actions 自动把各平台预编译二进制发布到 npm，安装后用户无需装 Python 即可运行：
+
+```bash
+npm install -g @yourscope/bili_live_replay
+bili_live_replay --version
+```
+
+结构说明：
+
+- `npm/bili_live_replay/`：主包，只放一个 JS 启动器，声明 `bin`；
+- `npm/{linux-x64,darwin-x64,darwin-arm64,win32-x64}/`：各平台的 PyInstaller 产物包，靠 `os`/`cpu` 字段让 npm 按平台自动选装；
+- `.github/workflows/publish.yml`：`push tag v*`（或手动触发）时编译并发布。
+
+发布前需做三件事：
+
+1. 把 `@yourscope` 全局替换成你的 npm 用户名（作为作用域）；
+2. 注册并登录 npm 账号，生成一个 Automation 类型的 Access Token；
+3. 把 Token 存到 GitHub 仓库的 Secret `NPM_TOKEN`。
+
+之后打一个版本 tag 即可自动发布：
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+> 注意：主包与各平台包的版本号需保持一致，工作流会以 tag 的版本号（`v` 后面的部分）统一覆盖。

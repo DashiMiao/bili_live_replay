@@ -60,6 +60,9 @@ API_SESSION = "https://api.live.bilibili.com/xlive/web-room/v1/videoService/GetU
 API_ROOM = "https://api.live.bilibili.com/room/v1/Room/get_info"
 API_NAV = "https://api.bilibili.com/x/web-interface/nav"
 
+VERSION = "1.0.0"
+AUTHOR = "dashimiao"
+
 
 def _app_dir() -> Path:
     """程序所在目录（PyInstaller 冻结时为可执行文件所在目录，否则为脚本目录）。"""
@@ -95,6 +98,7 @@ STRINGS = {
         "positional_title": "位置参数",
         "optional_title": "选项",
         "help_help": "显示帮助信息并退出",
+        "version_help": "显示版本号并退出",
         "err_recent_and_dates": "--recent 与日期列表不能同时使用",
         "err_nothing": "请提供日期列表（YYYY-MM-DD）或使用 --recent N",
         "err_recent_pos": "--recent 必须为正整数",
@@ -118,6 +122,7 @@ STRINGS = {
         "positional_title": "positional arguments",
         "optional_title": "options",
         "help_help": "show this help message and exit",
+        "version_help": "show program's version number and exit",
         "err_recent_and_dates": "--recent and date list cannot be used together",
         "err_nothing": "please provide dates (YYYY-MM-DD) or use --recent N",
         "err_recent_pos": "--recent must be a positive integer",
@@ -170,6 +175,19 @@ class LocalizedArgumentParser(argparse.ArgumentParser):
             formatter.end_section()
         formatter.add_text(self.epilog)
         return formatter.format_help()
+
+
+class _AuthorAction(argparse.Action):
+    """打印作者名并退出（彩蛋）。"""
+
+    def __init__(self, option_strings, dest=argparse.SUPPRESS,
+                 default=argparse.SUPPRESS, help=None):
+        super().__init__(option_strings=option_strings, dest=dest,
+                         default=default, nargs=0, help=help)
+
+    def __call__(self, parser, namespace, values, option_string=None):
+        print(AUTHOR)
+        parser.exit()
 
 
 # --------------------------------------------------------------------------- #
@@ -927,6 +945,9 @@ def main():
     ap.add_argument("--keep-temp", action="store_true", help=S["keep_temp_help"])
     ap.add_argument("--recent", type=int, default=0, help=S["recent_help"])
     ap.add_argument("--proxy", default="", help=S["proxy_help"])
+    ap.add_argument("--version", action="version",
+                    version=f"%(prog)s {VERSION}", help=S["version_help"])
+    ap.add_argument("--author", action=_AuthorAction, help=argparse.SUPPRESS)
     args = ap.parse_args()
 
     # 全局代理设置
