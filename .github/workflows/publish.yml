@@ -84,7 +84,7 @@ jobs:
           cp .binaries/bili_live_replay-linux-x64    npm/linux-x64/bin/bili_live_replay
           cp .binaries/bili_live_replay-darwin-x64   npm/darwin-x64/bin/bili_live_replay
           cp .binaries/bili_live_replay-darwin-arm64 npm/darwin-arm64/bin/bili_live_replay
-          cp .binaries/bili_live_replay-win32-x64    npm/win32-x64/bin/bili_live_replay.exe
+          cp .binaries/bili_live_replay-win32-x64.exe npm/win32-x64/bin/bili_live_replay.exe
           chmod +x npm/linux-x64/bin/bili_live_replay \
                    npm/darwin-x64/bin/bili_live_replay \
                    npm/darwin-arm64/bin/bili_live_replay
