@@ -34,7 +34,9 @@ jobs:
 
       - uses: actions/setup-python@v6
         with:
-          python-version: "3.12"
+          # 3.14 起 argparse 的 --help 会自带彩色输出；用 3.12 打包出来的二进制
+          # 在终端里没有颜色，和本地运行的观感不一致。
+          python-version: "3.14"
 
       - name: 编译二进制
         env:
