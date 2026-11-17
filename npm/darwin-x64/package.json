@@ -1,6 +1,6 @@
 {
   "name": "@miaodashi/bili_live_replay-darwin-x64",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "bili_live_replay 预编译二进制（macOS Intel x64）",
   "main": "index.js",
   "files": [
