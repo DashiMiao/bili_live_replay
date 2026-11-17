@@ -7,6 +7,30 @@
 
 工具源码是纯 Python，可在 **Linux / macOS / Windows** 上运行；也可以打包成各平台的原生可执行文件。
 
+### 支持的操作系统与架构
+
+**npm 预编译包**（`npm install -g @miaodashi/bili_live_replay`，无需安装 Python）：
+
+| 操作系统 | 架构 | 对应包 | 支持 |
+|---------|------|--------|------|
+| Linux | x86_64（x64） | `@miaodashi/bili_live_replay-linux-x64` | ✅ |
+| Linux | arm64（aarch64） | — | ❌ 未提供预编译包（可用源码方式） |
+| macOS | Intel（x64） | `@miaodashi/bili_live_replay-darwin-x64` | ✅ |
+| macOS | Apple Silicon（arm64） | `@miaodashi/bili_live_replay-darwin-arm64` | ✅ |
+| Windows | x64 | `@miaodashi/bili_live_replay-win32-x64` | ✅ |
+| Windows | arm64 | — | ❌ 未提供预编译包（可用源码方式） |
+
+**源码运行 / 自行打包**：Linux、macOS、Windows 都支持，CPU 架构跟随该机器上的 Python（x64、arm64 均可），要求 Python 3.8+ 和 `requests`。`build.py` 只能打包当前运行平台的产物，不支持交叉编译。
+
+**工具自动下载的架构支持**（系统里找不到 ffmpeg / aria2c 时）：
+
+| 工具 | Linux | macOS | Windows |
+|------|-------|-------|---------|
+| ffmpeg | x86_64 / arm64 | Intel / Apple Silicon | x64 |
+| aria2c | 不自动下载（建议 `sudo apt install aria2`，否则回退 Python 多线程） | Intel / Apple Silicon | x64 |
+
+> Linux 上 ffmpeg 会优先尝试从 apt 源下载（x86_64），失败再回退到 johnvansickle 的静态包。
+
 ### 方式一：直接跑源码（通用）
 
 任意系统，装好 Python 3.8+ 和一个依赖即可：
