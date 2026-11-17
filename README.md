@@ -11,16 +11,37 @@
 
 **npm 预编译包**（`npm install -g @miaodashi/bili_live_replay`，无需安装 Python）：
 
-| 操作系统 | 架构 | 对应包 | 支持 |
-|---------|------|--------|------|
-| Linux | x86_64（x64） | `@miaodashi/bili_live_replay-linux-x64` | ✅ |
-| Linux | arm64（aarch64） | — | ❌ 未提供预编译包（可用源码方式） |
-| macOS | Intel（x64） | `@miaodashi/bili_live_replay-darwin-x64` | ✅ |
-| macOS | Apple Silicon（arm64） | `@miaodashi/bili_live_replay-darwin-arm64` | ✅ |
-| Windows | x64 | `@miaodashi/bili_live_replay-win32-x64` | ✅ |
-| Windows | arm64 | — | ❌ 未提供预编译包（可用源码方式） |
+| 发行版 / 系统 | 最低版本 | 架构 | 支持 |
+|--------------|---------|------|------|
+| Ubuntu | 24.04 LTS | x86_64 | ✅ |
+| Linux Mint / Pop!_OS | 22 / 24.04 | x86_64 | ✅ |
+| Debian | 13（trixie） | x86_64 | ✅ |
+| Fedora | 40 | x86_64 | ✅ |
+| RHEL / Rocky Linux / AlmaLinux | 10 | x86_64 | ✅ |
+| CentOS Stream | 10 | x86_64 | ✅ |
+| Arch Linux / Manjaro | 滚动更新 | x86_64 | ✅ |
+| openSUSE | Tumbleweed / Leap 16 | x86_64 | ✅ |
+| 上述发行版的旧版本 | glibc < 2.39 | x86_64 | ❌ 请用源码方式 |
+| 任意 Linux 发行版 | — | arm64（aarch64） | ❌ 请用源码方式 |
+| macOS | — | Intel（x64） | ✅ |
+| macOS | — | Apple Silicon（arm64） | ✅ |
+| Windows | 10 / 11 | x64 | ✅ |
+| Windows | 10 / 11 | arm64 | ❌ 请用源码方式 |
 
-**源码运行 / 自行打包**：Linux、macOS、Windows 都支持，CPU 架构跟随该机器上的 Python（x64、arm64 均可），要求 Python 3.8+ 和 `requests`。`build.py` 只能打包当前运行平台的产物，不支持交叉编译。
+> 所有 Linux 发行版共用同一个 `@miaodashi/bili_live_replay-linux-x64` 包。从 1.0.2 起，该二进制在 Ubuntu 24.04 上构建，要求系统 **glibc ≥ 2.39**；更老的发行版（Ubuntu 22.04、Debian 12、RHEL 9 等）会报 `GLIBC_2.39 not found`，请改用源码方式运行。
+
+**源码运行 / 自行打包**：Linux、macOS、Windows 都支持（包括没覆盖到的 Linux arm64 和旧版本发行版），CPU 架构跟随本机 Python（x64 / arm64 均可），要求 Python 3.8+ 和 `requests`。`build.py` 只能打包当前运行平台的产物，不支持交叉编译。
+
+```bash
+# Debian / Ubuntu / Linux Mint / Pop!_OS
+sudo apt install python3 python3-requests
+# Fedora / RHEL / Rocky / AlmaLinux / CentOS Stream
+sudo dnf install python3 python3-requests
+# Arch Linux / Manjaro
+sudo pacman -S python python-requests
+# openSUSE
+sudo zypper install python3 python3-requests
+```
 
 **工具自动下载的架构支持**（系统里找不到 ffmpeg / aria2c 时）：
 
