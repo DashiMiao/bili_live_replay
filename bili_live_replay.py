@@ -60,7 +60,7 @@ API_SESSION = "https://api.live.bilibili.com/xlive/web-room/v1/videoService/GetU
 API_ROOM = "https://api.live.bilibili.com/room/v1/Room/get_info"
 API_NAV = "https://api.bilibili.com/x/web-interface/nav"
 
-VERSION = "1.0.0"
+VERSION = "1.0.1"
 AUTHOR = "dashimiao"
 
 
@@ -71,10 +71,36 @@ def _app_dir() -> Path:
     return Path(__file__).resolve().parent
 
 
-# ffmpeg / aria2c 等工具二进制：下载到程序同目录下的 tools/，方便随程序一起拷贝
-TOOLS_DIR = _app_dir() / "tools"
+# 用户缓存根目录（程序目录只读时的回退位置）
+CACHE_DIR = Path.home() / ".cache" / "bili-live-replay"
+
+
+def _is_writable_dir(p: Path) -> bool:
+    """尝试创建目录并写入一个探针文件，判断是否可写。"""
+    try:
+        p.mkdir(parents=True, exist_ok=True)
+        probe = p / ".write-test"
+        probe.write_text("", encoding="utf-8")
+        probe.unlink()
+        return True
+    except OSError:
+        return False
+
+
+def _tools_dir() -> Path:
+    """工具二进制目录：优先程序同目录下的 tools/（绿色便携），
+    程序目录不可写（如 npm -g / Program Files 安装）时回退到用户缓存目录。"""
+    local = _app_dir() / "tools"
+    if _is_writable_dir(local):
+        return local
+    return CACHE_DIR / "tools"
+
+
+# ffmpeg / aria2c 等工具二进制：下载到程序同目录下的 tools/，方便随程序一起拷贝；
+# 程序目录只读时自动回退到用户缓存目录
+TOOLS_DIR = _tools_dir()
 # 下载过程中的临时分片：仍放用户缓存目录（体量大、用完即删）
-WORK_DIR = Path.home() / ".cache" / "bili-live-replay" / "work"
+WORK_DIR = CACHE_DIR / "work"
 
 
 # --------------------------------------------------------------------------- #
@@ -349,7 +375,11 @@ def ensure_aria2c():
 
 def _fetch_aria2c_binary(cache_bin: Path) -> bool:
     """按平台自动下载 aria2c 到 cache_bin（Windows 官方包 / macOS 第三方静态包）。"""
-    cache_bin.mkdir(parents=True, exist_ok=True)
+    try:
+        cache_bin.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        warn(f"无法创建 aria2c 目录 {cache_bin}: {e}")
+        return False
     system = sys.platform
     machine = platform.machine().lower()
     try:
@@ -381,7 +411,11 @@ def _download_aria2c_windows(cache_bin: Path) -> bool:
     url = (f"https://github.com/aria2/aria2/releases/download/"
            f"release-{ARIA2C_VERSION}/aria2-{ARIA2C_VERSION}-win-64bit-build1.zip")
     zf = cache_bin / "aria2.zip"
-    cache_bin.mkdir(parents=True, exist_ok=True)
+    try:
+        cache_bin.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        warn(f"无法创建 aria2c 目录 {cache_bin}: {e}")
+        return False
     if not _download_file(url, zf):
         return False
     try:
@@ -602,7 +636,7 @@ def ensure_ffmpeg():
             return r
 
     # 4) 按平台自动下载静态 ffmpeg
-    info("未找到 ffmpeg，尝试自动下载到本地缓存...")
+    info(f"未找到 ffmpeg，尝试自动下载到 {TOOLS_DIR} ...")
     if _download_static_ffmpeg(cache_bin) and cf.exists() and cp.exists():
         return str(cf), str(cp), env
 
@@ -611,7 +645,8 @@ def ensure_ffmpeg():
         "darwin": "brew install ffmpeg",
         "win32": "winget install Gyan.FFmpeg",
     }
-    sys.exit(f"ffmpeg 自动下载失败，请手动安装：{hints.get(sys.platform, '安装 ffmpeg 并加入 PATH')}")
+    sys.exit(f"ffmpeg 自动下载失败，请手动安装：{hints.get(sys.platform, '安装 ffmpeg 并加入 PATH')}"
+             f"（工具目录：{TOOLS_DIR}）")
 
 
 def _try_apt_ffmpeg():
@@ -685,7 +720,11 @@ def _download_binary(url: str, dest: Path) -> bool:
 
 def _download_static_ffmpeg(cache_bin: Path) -> bool:
     """按平台下载静态 ffmpeg/ffprobe 到 cache_bin，成功返回 True。"""
-    cache_bin.mkdir(parents=True, exist_ok=True)
+    try:
+        cache_bin.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        warn(f"无法创建 ffmpeg 目录 {cache_bin}: {e}")
+        return False
     system = sys.platform
     machine = platform.machine().lower()
     tmp = cache_bin.parent
