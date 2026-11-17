@@ -442,27 +442,37 @@ def _print_progress(done: int, total: int, speed: float, elapsed: float):
     sys.stdout.flush()
 
 
-def _scan_dir(outdir: Path):
-    segs = list(outdir.glob("seg_*.m4s"))
-    return len(segs), sum(s.stat().st_size for s in segs)
+def _scan_items(outdir: Path, items: list):
+    """统计本批 items 中已存在的分片数量与总字节数（用于进度显示）。"""
+    n, size = 0, 0
+    for i, _ in items:
+        try:
+            size += (outdir / f"seg_{i:05d}.m4s").stat().st_size
+            n += 1
+        except OSError:
+            pass
+    return n, size
 
 
-def _download_aria2c(urls: list, outdir: Path, referer: str, aria2c: str) -> bool:
-    inp = outdir / "aria_input.txt"
+def _download_aria2c(items: list, outdir: Path, referer: str, aria2c: str,
+                     jobs: int = 64, tries: int = 5, retry_wait: int = 2,
+                     logname: str = "aria2c.log") -> bool:
+    """用 aria2c 批量下载分片。items 为 [(序号, url), ...]，序号用于生成文件名。"""
+    inp = outdir / f"{logname.replace('.log', '')}_input.txt"
     with open(inp, "w", encoding="utf-8") as f:
-        for i, u in enumerate(urls, 1):
+        for i, u in items:
             f.write(u + "\n")
             f.write(f"  out=seg_{i:05d}.m4s\n")
             f.write("\n")
     cmd = [aria2c, "-i", str(inp), "-d", str(outdir),
            "--auto-file-renaming=false", "--allow-overwrite=true",
-           "--file-allocation=none", "--max-tries=5", "--retry-wait=2",
+           "--file-allocation=none", f"--max-tries={tries}", f"--retry-wait={retry_wait}",
            "--timeout=30", "--connect-timeout=15",
-           "-j", "64", "-x", "1", "-s", "1",
+           "-j", str(jobs), "-x", "1", "-s", "1",
            "--console-log-level=warn", "--summary-interval=10",
            "--user-agent", UA, "--referer", referer]
-    logfile = outdir / "aria2c.log"
-    total = len(urls)
+    logfile = outdir / logname
+    total = len(items)
     with open(logfile, "w", encoding="utf-8") as f:
         p = subprocess.Popen(cmd, stdout=f, stderr=subprocess.STDOUT)
     t0 = time.time()
@@ -470,7 +480,7 @@ def _download_aria2c(urls: list, outdir: Path, referer: str, aria2c: str) -> boo
     last_t = t0
     try:
         while p.poll() is None:
-            done, cur_bytes = _scan_dir(outdir)
+            done, cur_bytes = _scan_items(outdir, items)
             now = time.time()
             dt = now - last_t
             if dt >= 1.0:
@@ -489,7 +499,7 @@ def _download_aria2c(urls: list, outdir: Path, referer: str, aria2c: str) -> boo
         sys.stdout.write("\n")
         sys.stdout.flush()
         raise
-    done, _ = _scan_dir(outdir)
+    done, _ = _scan_items(outdir, items)
     _print_progress(done, total, 0.0, time.time() - t0)
     sys.stdout.write("\n")
     sys.stdout.flush()
@@ -510,9 +520,9 @@ def _download_one(args):
     return False
 
 
-def _download_py(urls: list, outdir: Path, headers) -> bool:
+def _download_py(items: list, outdir: Path, headers) -> bool:
     tasks = []
-    for i, u in enumerate(urls, 1):
+    for i, u in items:
         tasks.append((u, outdir / f"seg_{i:05d}.m4s", headers))
     total = len(tasks)
     ok = 0
@@ -527,7 +537,7 @@ def _download_py(urls: list, outdir: Path, headers) -> bool:
                 now = time.time()
                 dt = now - last_t
                 if dt >= 1.0:
-                    done, cur_bytes = _scan_dir(outdir)
+                    _, cur_bytes = _scan_items(outdir, items)
                     speed = (cur_bytes - last_bytes) / dt if dt > 0 else 0.0
                     last_bytes = cur_bytes
                     last_t = now
@@ -542,22 +552,56 @@ def _download_py(urls: list, outdir: Path, headers) -> bool:
     _print_progress(ok, total, 0.0, time.time() - t0)
     sys.stdout.write("\n")
     sys.stdout.flush()
-    return ok == len(urls)
+    return ok == total
 
 
-def download_segments(urls: list, outdir: Path, headers, referer: str) -> bool:
+def _missing_segments(outdir: Path, total: int) -> list:
+    """返回缺失或空文件的分片序号（1 起）。"""
+    missing = []
+    for i in range(1, total + 1):
+        p = outdir / f"seg_{i:05d}.m4s"
+        if not p.exists() or p.stat().st_size == 0:
+            missing.append(i)
+    return missing
+
+
+def download_segments(urls: list, outdir: Path, headers, referer: str) -> list:
+    """下载全部分片，返回最终仍缺失的序号（1 起）；全部成功返回空列表。"""
     outdir.mkdir(parents=True, exist_ok=True)
     t0 = time.time()
+    total = len(urls)
     aria2c = ensure_aria2c()
     if aria2c:
-        info(f"开始并行下载 {len(urls)} 个分片（aria2c）...")
-        ok = _download_aria2c(urls, outdir, referer, aria2c)
+        info(f"开始并行下载 {total} 个分片（aria2c）...")
+        _download_aria2c(list(enumerate(urls, 1)), outdir, referer, aria2c)
     else:
         info("未检测到 aria2c，使用 Python 多线程下载（较慢）")
-        ok = _download_py(urls, outdir, headers)
-    n = len(list(outdir.glob("seg_*.m4s")))
-    log(f"  下载完成 {n}/{len(urls)} 个分片，耗时 {time.time()-t0:.0f}s")
-    return ok and n == len(urls)
+        _download_py(list(enumerate(urls, 1)), outdir, headers)
+    n = total - len(_missing_segments(outdir, total))
+    log(f"  下载完成 {n}/{total} 个分片，耗时 {time.time()-t0:.0f}s")
+
+    # 个别分片偶发失败（CDN 限流 / 连接重置 / 临时 404）时，单独低并发重试一轮
+    missing = _missing_segments(outdir, total)
+    if not missing:
+        return []
+    for i in missing:
+        (outdir / f"seg_{i:05d}.m4s").unlink(missing_ok=True)  # 丢弃可能存在的空文件
+    warn(f"{len(missing)} 个分片未下载成功，正在低并发重试 ...")
+    items = [(i, urls[i - 1]) for i in missing]
+    if aria2c:
+        _download_aria2c(items, outdir, referer, aria2c,
+                         jobs=4 if len(items) <= 50 else 16,
+                         tries=6, retry_wait=3, logname="aria2c_retry.log")
+    else:
+        _download_py(items, outdir, headers)
+    missing = _missing_segments(outdir, total)
+    if missing:
+        preview = "、".join(str(i) for i in missing[:10])
+        warn(f"重试后仍有 {len(missing)} 个分片缺失：{preview}"
+             f"{' ...' if len(missing) > 10 else ''}")
+    else:
+        log("  重试后已补齐全部分片")
+    return missing
 
 
 # --------------------------------------------------------------------------- #
@@ -585,10 +629,14 @@ def fetch_m3u8(url: str, headers) -> str:
     return ""
 
 
-def build_local_m3u8(extinfs: list, subdir: Path) -> Path:
+def build_local_m3u8(extinfs: list, subdir: Path, skip=()) -> Path:
+    """生成本地 m3u8；skip 中的分片序号（1 起）不会写入，用于容忍个别缺失分片。"""
+    skip = set(skip)
     lines = ["#EXTM3U", "#EXT-X-VERSION:7", "#EXT-X-TARGETDURATION:5",
              "#EXT-X-PLAYLIST-TYPE:VOD"]
     for i, ext in enumerate(extinfs, 1):
+        if i in skip:
+            continue
         lines.append(ext)
         lines.append(f"seg_{i:05d}.m4s")
     lines.append("#EXT-X-ENDLIST")
@@ -913,10 +961,22 @@ def process_replay(replay, uid, date_str, prefix, headers, referer,
             continue
         extinfs, urls = parse_m3u8(m3u8_text)
         log(f"  段{i+1}: 共 {len(urls)} 个分片，开始下载...")
-        if not download_segments(urls, subdir, headers, referer):
-            warn(f"段{i+1} 下载不完整，跳过该段")
-            continue
-        local = build_local_m3u8(extinfs, subdir)
+        missing = download_segments(urls, subdir, headers, referer)
+        if missing:
+            # 偶发失败的分片没必要让整场几小时的回放作废：少量缺失就跳过这些位置继续合成
+            limit = min(50, max(3, len(urls) // 100))
+            if len(missing) > limit:
+                warn(f"段{i+1} 缺失 {len(missing)}/{len(urls)} 个分片，超过容忍上限（{limit}），跳过该段")
+                continue
+            gap = 0.0
+            for i in missing:
+                if i <= len(extinfs):
+                    try:
+                        gap += float(extinfs[i - 1].split(":")[1].split(",")[0])
+                    except (IndexError, ValueError):
+                        pass
+            warn(f"段{i+1} 缺失 {len(missing)} 个分片（约 {gap:.0f} 秒），已跳过这些位置继续合成")
+        local = build_local_m3u8(extinfs, subdir, skip=missing)
         out_mp4 = workdir / f"slice{i}.mp4"
         if not remux_to_mp4(ffmpeg, env, local, out_mp4):
             warn(f"段{i+1} 转封装失败")
