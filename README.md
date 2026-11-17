@@ -7,6 +7,83 @@
 
 工具源码是纯 Python，可在 **Linux / macOS / Windows** 上运行；也可以打包成各平台的原生可执行文件。
 
+### 支持的操作系统与架构
+
+**npm 预编译包**（`npm install -g @miaodashi/bili_live_replay`，无需安装 Python）：
+
+Linux 预编译二进制要求 **x86_64 架构 + glibc ≥ 2.38**（从 1.0.3 起在 Ubuntu 24.04 上构建），两者都满足才能运行：
+
+| 发行版 | 版本 | glibc | npm 版 |
+|--------|------|-------|--------|
+| Ubuntu | 26.04 LTS | 2.43 | ✅ |
+| Ubuntu | 24.04 LTS | 2.39 | ✅ |
+| Ubuntu | 23.10 | 2.38 | ✅ |
+| Ubuntu | 22.04 / 20.04 / 18.04 | 2.35 / 2.31 / 2.27 | ❌ |
+| Debian | 13（trixie） | 2.41 | ✅ |
+| Debian | 12（bookworm）/ 11 / 10 | 2.36 / 2.31 / 2.28 | ❌ |
+| Fedora | 39 及以上 | ≥ 2.38 | ✅ |
+| Fedora | 38 及以下 | ≤ 2.37 | ❌ |
+| RHEL / Rocky Linux / AlmaLinux / Oracle Linux | 10 及以上 | 2.39 | ✅ |
+| RHEL / Rocky Linux / AlmaLinux / Oracle Linux | 9 / 8 / 7 | 2.34 / 2.28 / 2.17 | ❌ |
+| CentOS Stream | 10 | 2.39 | ✅ |
+| CentOS / CentOS Stream | 7 / 8 / Stream 9 | ≤ 2.34 | ❌ |
+| Amazon Linux | 2023 / 2 | 2.34 / 2.26 | ❌ |
+| Linux Mint | 22 及以上 | ≥ 2.39 | ✅ |
+| Linux Mint | 21 / 20 | 2.35 / 2.31 | ❌ |
+| Pop!_OS | 24.04 及以上 | 2.39 | ✅ |
+| Pop!_OS | 22.04 | 2.35 | ❌ |
+| openSUSE Leap | 15.6 / 16 | 2.38 / 2.40 | ✅ |
+| openSUSE Leap | 15.5 及更早 | ≤ 2.31 | ❌ |
+| SUSE Linux Enterprise | 15 SP6 / 16 | 2.38 / 2.40 | ✅ |
+| SUSE Linux Enterprise | 15 SP5 及更早 | ≤ 2.31 | ❌ |
+| openSUSE Tumbleweed | 滚动更新 | ≥ 2.40 | ✅ |
+| Arch Linux / Manjaro / EndeavourOS / Garuda / Kali Linux | 滚动更新 | ≥ 2.40 | ✅ |
+| Alpine Linux | 全部版本 | musl libc | ❌ |
+| 其他 glibc 发行版（Gentoo、NixOS、Deepin 等） | — | ≥ 2.38 | 视 glibc 版本 |
+
+**其他系统与架构**：
+
+| 系统 | 架构 | npm 版 | 说明 |
+|------|------|--------|------|
+| macOS | Intel（x64） | ✅ | 用 `-darwin-x64` 包 |
+| macOS | Apple Silicon（arm64） | ✅ | 用 `-darwin-arm64` 包 |
+| Windows 10 / 11 | x64 | ✅ | 用 `-win32-x64` 包 |
+| Windows 7 / 8 / 8.1 | x64 | ❌ | Python 3.14 已不支持 |
+| Windows on ARM | arm64 | ❌ | 没有对应包，可用源码方式 |
+| Linux | arm64 / aarch64（树莓派、ARM 服务器） | ❌ | 没有对应包，可用源码方式 |
+| Linux / Windows | 32 位 x86（i686） | ❌ | 没有对应包 |
+| Linux | ARMv7 / armhf | ❌ | 没有对应包 |
+| Linux | RISC-V / ppc64le / s390x | ❌ | 没有对应包 |
+| FreeBSD / OpenBSD 等非 glibc 系统 | — | ❌ | 没有对应包，可用源码方式 |
+
+> - 所有 Linux 发行版共用同一个 `@miaodashi/bili_live_replay-linux-x64` 包；低于 glibc 2.38 时会报 `GLIBC_2.38 not found`，Alpine 则是 musl libc 不兼容。
+> - WSL2 按里面装的发行版判断（如 Ubuntu 24.04 ✅、Ubuntu 22.04 ❌）；Docker / Podman 请选 glibc ≥ 2.38 的基础镜像（如 `ubuntu:24.04`、`debian:13`）。
+> - 查看自己的系统：`uname -m` 看架构（`x86_64` / `aarch64`），`ldd --version | head -1` 看 glibc 版本。
+
+**源码运行 / 自行打包**：Linux、macOS、Windows 都支持（包括上表中 ❌ 的系统：旧版本发行版、Alpine、ARM64、32 位等），CPU 架构跟随本机 Python，要求 Python 3.8+ 和 `requests`。`build.py` 只能打包当前运行平台的产物，不支持交叉编译。
+
+```bash
+# Debian / Ubuntu / Linux Mint / Pop!_OS
+sudo apt install python3 python3-requests
+# Fedora / RHEL / Rocky / AlmaLinux / CentOS Stream
+sudo dnf install python3 python3-requests
+# Arch Linux / Manjaro
+sudo pacman -S python python-requests
+# openSUSE / SLES
+sudo zypper install python3 python3-requests
+# Alpine（还需用 apk 装 ffmpeg，工具会自动使用系统 ffmpeg）
+sudo apk add python3 py3-requests ffmpeg
+```
+
+**工具自动下载的架构支持**（系统里找不到 ffmpeg / aria2c 时）：
+
+| 工具 | Linux | macOS | Windows |
+|------|-------|-------|---------|
+| ffmpeg | x86_64 / arm64（glibc 发行版） | Intel / Apple Silicon | x64 |
+| aria2c | 不自动下载（建议 `sudo apt install aria2`，否则回退 Python 多线程） | Intel / Apple Silicon | x64 |
+
+> Linux 上 ffmpeg 会优先尝试从 apt 源下载（x86_64），失败再回退到 johnvansickle 的静态包。
+
 ### 方式一：直接跑源码（通用）
 
 任意系统，装好 Python 3.8+ 和一个依赖即可：
@@ -104,6 +181,15 @@ bili_live_replay --room-id 9308312 --cookie-file cookie.txt --recent 3
 - `alert_message`：平台提示（如“请关注直播时网络状况”）；
 - 会话弹幕数据：断流期间弹幕是否仍在（仍在则说明只是推流断了、直播间没关）。
 
+## 分片下载失败
+
+回放视频由几千个几秒长的分片组成，长时间下载过程中偶尔会有个别分片失败（CDN 限流、连接重置、临时 404 等）。工具的处理方式：
+
+1. 第一轮按 64 并发下载全部分片；
+2. 若有分片缺失/为空，自动用低并发再重试一轮；
+3. 重试后仍缺失的少量分片（≤ 总数 1%，最多 50 个）会直接跳过，继续合成其余内容，并提示缺失数量和大致时长；
+4. 缺失过多（超过上限，通常是网络整体不通）才会跳过该段。
+
 ## 说明
 
 - 下载他人直播间回放，需要你的账号已获得该主播的「剪辑权限（授权）」，否则接口返回 `301 没有剪辑权限`。
@@ -132,7 +218,7 @@ bili_live_replay --version
 1. 注册 npm 账号 `miaodashi` 并开启 2FA；
 2. 创建一个短期 Granular Access Token，赋予 `@miaodashi` 作用域读写权限并开启 Bypass 2FA；
 3. 把 Token 存到 GitHub 仓库的 Secret `NPM_TOKEN`；
-4. 在 GitHub Actions 手动运行 `publish`，输入版本号，例如 `1.0.2`。
+4. 在 GitHub Actions 手动运行 `publish`，输入版本号，例如 `1.0.3`。
 
 首次发布成功后，在 npm 上分别打开主包和 4 个平台包的 Settings → Trusted Publishing，每个包都配置：
 
@@ -142,11 +228,11 @@ bili_live_replay --version
 - Workflow filename：`publish.yml`
 - Allowed actions：允许 `npm publish`
 
-在创建 Trusted Publisher 后的 2 天内，删除 GitHub 中的 `NPM_TOKEN` 和 npm 上的短期 Token，再发布一个新版本（例如 `1.0.2`）以完成 OIDC 验证。之后打版本 tag 即可自动发布：
+在创建 Trusted Publisher 后的 2 天内，删除 GitHub 中的 `NPM_TOKEN` 和 npm 上的短期 Token，再发布一个新版本（例如 `1.0.3`）以完成 OIDC 验证。之后打版本 tag 即可自动发布：
 
 ```bash
-git tag v1.0.2
-git push origin v1.0.2
+git tag v1.0.3
+git push origin v1.0.3
 ```
 
 > 注意：主包、平台包及主包的 `optionalDependencies` 版本号必须保持一致；工作流会以 tag 中 `v` 后面的版本号统一设置。npm 不允许覆盖已发布的同版本内容。
