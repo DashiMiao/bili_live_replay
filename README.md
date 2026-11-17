@@ -11,28 +11,56 @@
 
 **npm 预编译包**（`npm install -g @miaodashi/bili_live_replay`，无需安装 Python）：
 
-| 系统 | npm 版能否运行 |
-|------|----------------|
-| Ubuntu 24.04 / 26.04 | ✅ |
-| Ubuntu 22.04（glibc 2.35） | ❌ |
-| Debian 13+ | ✅ |
-| Debian 12（glibc 2.36） | ❌ |
-| Fedora 39+、RHEL 10+ | ✅ |
-| RHEL / CentOS 8、9、Amazon Linux 2023（glibc ≤ 2.34） | ❌ |
-| Linux Mint 22+、Pop!_OS 24.04+ | ✅ |
-| Arch Linux / Manjaro / openSUSE Tumbleweed | ✅ |
-| openSUSE Leap 16+ | ✅ |
-| openSUSE Leap 15.x | ❌ |
-| Alpine Linux（musl libc） | ❌ |
-| Linux ARM64 / aarch64（树莓派、ARM 服务器） | ❌ 没有对应包 |
-| 32 位 x86、ARMv7 | ❌ 没有对应包 |
-| macOS（Intel / Apple Silicon） | ✅ |
-| Windows 10 / 11（x64） | ✅ |
-| Windows on ARM（arm64） | ❌ 没有对应包 |
+Linux 预编译二进制要求 **x86_64 架构 + glibc ≥ 2.38**（从 1.0.2 起在 Ubuntu 24.04 上构建），两者都满足才能运行：
 
-> 所有 Linux 发行版共用同一个 `@miaodashi/bili_live_replay-linux-x64` 包。从 1.0.2 起，该二进制在 Ubuntu 24.04 上构建，要求系统 **glibc ≥ 2.38**。低于该版本的发行版（Ubuntu 22.04、Debian 12、RHEL 8/9、Amazon Linux 2023 等）运行时会报 `GLIBC_2.38 not found`，Alpine 则会因 musl libc 不兼容而无法运行；这些系统请改用下面的源码方式。
+| 发行版 | 版本 | glibc | npm 版 |
+|--------|------|-------|--------|
+| Ubuntu | 26.04 LTS | 2.43 | ✅ |
+| Ubuntu | 24.04 LTS | 2.39 | ✅ |
+| Ubuntu | 23.10 | 2.38 | ✅ |
+| Ubuntu | 22.04 / 20.04 / 18.04 | 2.35 / 2.31 / 2.27 | ❌ |
+| Debian | 13（trixie） | 2.41 | ✅ |
+| Debian | 12（bookworm）/ 11 / 10 | 2.36 / 2.31 / 2.28 | ❌ |
+| Fedora | 39 及以上 | ≥ 2.38 | ✅ |
+| Fedora | 38 及以下 | ≤ 2.37 | ❌ |
+| RHEL / Rocky Linux / AlmaLinux / Oracle Linux | 10 及以上 | 2.39 | ✅ |
+| RHEL / Rocky Linux / AlmaLinux / Oracle Linux | 9 / 8 / 7 | 2.34 / 2.28 / 2.17 | ❌ |
+| CentOS Stream | 10 | 2.39 | ✅ |
+| CentOS / CentOS Stream | 7 / 8 / Stream 9 | ≤ 2.34 | ❌ |
+| Amazon Linux | 2023 / 2 | 2.34 / 2.26 | ❌ |
+| Linux Mint | 22 及以上 | ≥ 2.39 | ✅ |
+| Linux Mint | 21 / 20 | 2.35 / 2.31 | ❌ |
+| Pop!_OS | 24.04 及以上 | 2.39 | ✅ |
+| Pop!_OS | 22.04 | 2.35 | ❌ |
+| openSUSE Leap | 15.6 / 16 | 2.38 / 2.40 | ✅ |
+| openSUSE Leap | 15.5 及更早 | ≤ 2.31 | ❌ |
+| SUSE Linux Enterprise | 15 SP6 / 16 | 2.38 / 2.40 | ✅ |
+| SUSE Linux Enterprise | 15 SP5 及更早 | ≤ 2.31 | ❌ |
+| openSUSE Tumbleweed | 滚动更新 | ≥ 2.40 | ✅ |
+| Arch Linux / Manjaro / EndeavourOS / Garuda / Kali Linux | 滚动更新 | ≥ 2.40 | ✅ |
+| Alpine Linux | 全部版本 | musl libc | ❌ |
+| 其他 glibc 发行版（Gentoo、NixOS、Deepin 等） | — | ≥ 2.38 | 视 glibc 版本 |
 
-**源码运行 / 自行打包**：Linux、macOS、Windows 都支持（包括上表中 ❌ 的系统：旧版本发行版、Alpine、ARM64 等），CPU 架构跟随本机 Python（x64 / arm64 均可），要求 Python 3.8+ 和 `requests`。`build.py` 只能打包当前运行平台的产物，不支持交叉编译。
+**其他系统与架构**：
+
+| 系统 | 架构 | npm 版 | 说明 |
+|------|------|--------|------|
+| macOS | Intel（x64） | ✅ | 用 `-darwin-x64` 包 |
+| macOS | Apple Silicon（arm64） | ✅ | 用 `-darwin-arm64` 包 |
+| Windows 10 / 11 | x64 | ✅ | 用 `-win32-x64` 包 |
+| Windows 7 / 8 / 8.1 | x64 | ❌ | Python 3.14 已不支持 |
+| Windows on ARM | arm64 | ❌ | 没有对应包，可用源码方式 |
+| Linux | arm64 / aarch64（树莓派、ARM 服务器） | ❌ | 没有对应包，可用源码方式 |
+| Linux / Windows | 32 位 x86（i686） | ❌ | 没有对应包 |
+| Linux | ARMv7 / armhf | ❌ | 没有对应包 |
+| Linux | RISC-V / ppc64le / s390x | ❌ | 没有对应包 |
+| FreeBSD / OpenBSD 等非 glibc 系统 | — | ❌ | 没有对应包，可用源码方式 |
+
+> - 所有 Linux 发行版共用同一个 `@miaodashi/bili_live_replay-linux-x64` 包；低于 glibc 2.38 时会报 `GLIBC_2.38 not found`，Alpine 则是 musl libc 不兼容。
+> - WSL2 按里面装的发行版判断（如 Ubuntu 24.04 ✅、Ubuntu 22.04 ❌）；Docker / Podman 请选 glibc ≥ 2.38 的基础镜像（如 `ubuntu:24.04`、`debian:13`）。
+> - 查看自己的系统：`uname -m` 看架构（`x86_64` / `aarch64`），`ldd --version | head -1` 看 glibc 版本。
+
+**源码运行 / 自行打包**：Linux、macOS、Windows 都支持（包括上表中 ❌ 的系统：旧版本发行版、Alpine、ARM64、32 位等），CPU 架构跟随本机 Python，要求 Python 3.8+ 和 `requests`。`build.py` 只能打包当前运行平台的产物，不支持交叉编译。
 
 ```bash
 # Debian / Ubuntu / Linux Mint / Pop!_OS
@@ -41,7 +69,7 @@ sudo apt install python3 python3-requests
 sudo dnf install python3 python3-requests
 # Arch Linux / Manjaro
 sudo pacman -S python python-requests
-# openSUSE
+# openSUSE / SLES
 sudo zypper install python3 python3-requests
 # Alpine（还需用 apk 装 ffmpeg，工具会自动使用系统 ffmpeg）
 sudo apk add python3 py3-requests ffmpeg
