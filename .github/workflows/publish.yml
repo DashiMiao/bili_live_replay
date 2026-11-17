@@ -20,7 +20,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-latest
+          # Linux 固定在 24.04 上构建：PyInstaller 会把系统库一起打包，
+          # 用更新的发行版构建会抬高 glibc 要求，导致 Ubuntu 24.04 / Debian 13 等跑不起来。
+          - os: ubuntu-24.04
             pkg: linux-x64
           - os: macos-15-intel
             pkg: darwin-x64
