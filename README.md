@@ -11,26 +11,28 @@
 
 **npm 预编译包**（`npm install -g @miaodashi/bili_live_replay`，无需安装 Python）：
 
-| 发行版 / 系统 | 最低版本 | 架构 | 支持 |
-|--------------|---------|------|------|
-| Ubuntu | 24.04 LTS | x86_64 | ✅ |
-| Linux Mint / Pop!_OS | 22 / 24.04 | x86_64 | ✅ |
-| Debian | 13（trixie） | x86_64 | ✅ |
-| Fedora | 40 | x86_64 | ✅ |
-| RHEL / Rocky Linux / AlmaLinux | 10 | x86_64 | ✅ |
-| CentOS Stream | 10 | x86_64 | ✅ |
-| Arch Linux / Manjaro | 滚动更新 | x86_64 | ✅ |
-| openSUSE | Tumbleweed / Leap 16 | x86_64 | ✅ |
-| 上述发行版的旧版本 | glibc < 2.39 | x86_64 | ❌ 请用源码方式 |
-| 任意 Linux 发行版 | — | arm64（aarch64） | ❌ 请用源码方式 |
-| macOS | — | Intel（x64） | ✅ |
-| macOS | — | Apple Silicon（arm64） | ✅ |
-| Windows | 10 / 11 | x64 | ✅ |
-| Windows | 10 / 11 | arm64 | ❌ 请用源码方式 |
+| 系统 | npm 版能否运行 |
+|------|----------------|
+| Ubuntu 24.04 / 26.04 | ✅ |
+| Ubuntu 22.04（glibc 2.35） | ❌ |
+| Debian 13+ | ✅ |
+| Debian 12（glibc 2.36） | ❌ |
+| Fedora 39+、RHEL 10+ | ✅ |
+| RHEL / CentOS 8、9、Amazon Linux 2023（glibc ≤ 2.34） | ❌ |
+| Linux Mint 22+、Pop!_OS 24.04+ | ✅ |
+| Arch Linux / Manjaro / openSUSE Tumbleweed | ✅ |
+| openSUSE Leap 16+ | ✅ |
+| openSUSE Leap 15.x | ❌ |
+| Alpine Linux（musl libc） | ❌ |
+| Linux ARM64 / aarch64（树莓派、ARM 服务器） | ❌ 没有对应包 |
+| 32 位 x86、ARMv7 | ❌ 没有对应包 |
+| macOS（Intel / Apple Silicon） | ✅ |
+| Windows 10 / 11（x64） | ✅ |
+| Windows on ARM（arm64） | ❌ 没有对应包 |
 
-> 所有 Linux 发行版共用同一个 `@miaodashi/bili_live_replay-linux-x64` 包。从 1.0.2 起，该二进制在 Ubuntu 24.04 上构建，要求系统 **glibc ≥ 2.39**；更老的发行版（Ubuntu 22.04、Debian 12、RHEL 9 等）会报 `GLIBC_2.39 not found`，请改用源码方式运行。
+> 所有 Linux 发行版共用同一个 `@miaodashi/bili_live_replay-linux-x64` 包。从 1.0.2 起，该二进制在 Ubuntu 24.04 上构建，要求系统 **glibc ≥ 2.38**。低于该版本的发行版（Ubuntu 22.04、Debian 12、RHEL 8/9、Amazon Linux 2023 等）运行时会报 `GLIBC_2.38 not found`，Alpine 则会因 musl libc 不兼容而无法运行；这些系统请改用下面的源码方式。
 
-**源码运行 / 自行打包**：Linux、macOS、Windows 都支持（包括没覆盖到的 Linux arm64 和旧版本发行版），CPU 架构跟随本机 Python（x64 / arm64 均可），要求 Python 3.8+ 和 `requests`。`build.py` 只能打包当前运行平台的产物，不支持交叉编译。
+**源码运行 / 自行打包**：Linux、macOS、Windows 都支持（包括上表中 ❌ 的系统：旧版本发行版、Alpine、ARM64 等），CPU 架构跟随本机 Python（x64 / arm64 均可），要求 Python 3.8+ 和 `requests`。`build.py` 只能打包当前运行平台的产物，不支持交叉编译。
 
 ```bash
 # Debian / Ubuntu / Linux Mint / Pop!_OS
@@ -41,13 +43,15 @@ sudo dnf install python3 python3-requests
 sudo pacman -S python python-requests
 # openSUSE
 sudo zypper install python3 python3-requests
+# Alpine（还需用 apk 装 ffmpeg，工具会自动使用系统 ffmpeg）
+sudo apk add python3 py3-requests ffmpeg
 ```
 
 **工具自动下载的架构支持**（系统里找不到 ffmpeg / aria2c 时）：
 
 | 工具 | Linux | macOS | Windows |
 |------|-------|-------|---------|
-| ffmpeg | x86_64 / arm64 | Intel / Apple Silicon | x64 |
+| ffmpeg | x86_64 / arm64（glibc 发行版） | Intel / Apple Silicon | x64 |
 | aria2c | 不自动下载（建议 `sudo apt install aria2`，否则回退 Python 多线程） | Intel / Apple Silicon | x64 |
 
 > Linux 上 ffmpeg 会优先尝试从 apt 源下载（x86_64），失败再回退到 johnvansickle 的静态包。
