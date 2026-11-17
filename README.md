@@ -132,7 +132,7 @@ bili_live_replay --version
 1. 注册 npm 账号 `miaodashi` 并开启 2FA；
 2. 创建一个短期 Granular Access Token，赋予 `@miaodashi` 作用域读写权限并开启 Bypass 2FA；
 3. 把 Token 存到 GitHub 仓库的 Secret `NPM_TOKEN`；
-4. 在 GitHub Actions 手动运行 `publish`，输入版本号，例如 `1.0.1`。
+4. 在 GitHub Actions 手动运行 `publish`，输入版本号，例如 `1.0.2`。
 
 首次发布成功后，在 npm 上分别打开主包和 4 个平台包的 Settings → Trusted Publishing，每个包都配置：
 
@@ -142,7 +142,7 @@ bili_live_replay --version
 - Workflow filename：`publish.yml`
 - Allowed actions：允许 `npm publish`
 
-在创建 Trusted Publisher 后的 2 天内，删除 GitHub 中的 `NPM_TOKEN` 和 npm 上的短期 Token，再发布一个新版本（例如 `1.0.1`）以完成 OIDC 验证。之后打版本 tag 即可自动发布：
+在创建 Trusted Publisher 后的 2 天内，删除 GitHub 中的 `NPM_TOKEN` 和 npm 上的短期 Token，再发布一个新版本（例如 `1.0.2`）以完成 OIDC 验证。之后打版本 tag 即可自动发布：
 
 ```bash
 git tag v1.0.2
