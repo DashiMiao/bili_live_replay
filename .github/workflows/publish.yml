@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "要发布的版本号（例如 1.0.1）"
+        description: "要发布的版本号（例如 1.0.2）"
         required: true
-        default: "1.0.1"
+        default: "1.0.2"
 
 jobs:
   # 1) 在各平台用 PyInstaller 编译出原生二进制，作为 artifact 暂存
