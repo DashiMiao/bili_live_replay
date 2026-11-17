@@ -11,7 +11,7 @@
 
 **npm 预编译包**（`npm install -g @miaodashi/bili_live_replay`，无需安装 Python）：
 
-Linux 预编译二进制要求 **x86_64 架构 + glibc ≥ 2.38**（从 1.0.2 起在 Ubuntu 24.04 上构建），两者都满足才能运行：
+Linux 预编译二进制要求 **x86_64 架构 + glibc ≥ 2.38**（从 1.0.3 起在 Ubuntu 24.04 上构建），两者都满足才能运行：
 
 | 发行版 | 版本 | glibc | npm 版 |
 |--------|------|-------|--------|
@@ -218,7 +218,7 @@ bili_live_replay --version
 1. 注册 npm 账号 `miaodashi` 并开启 2FA；
 2. 创建一个短期 Granular Access Token，赋予 `@miaodashi` 作用域读写权限并开启 Bypass 2FA；
 3. 把 Token 存到 GitHub 仓库的 Secret `NPM_TOKEN`；
-4. 在 GitHub Actions 手动运行 `publish`，输入版本号，例如 `1.0.2`。
+4. 在 GitHub Actions 手动运行 `publish`，输入版本号，例如 `1.0.3`。
 
 首次发布成功后，在 npm 上分别打开主包和 4 个平台包的 Settings → Trusted Publishing，每个包都配置：
 
@@ -228,11 +228,11 @@ bili_live_replay --version
 - Workflow filename：`publish.yml`
 - Allowed actions：允许 `npm publish`
 
-在创建 Trusted Publisher 后的 2 天内，删除 GitHub 中的 `NPM_TOKEN` 和 npm 上的短期 Token，再发布一个新版本（例如 `1.0.2`）以完成 OIDC 验证。之后打版本 tag 即可自动发布：
+在创建 Trusted Publisher 后的 2 天内，删除 GitHub 中的 `NPM_TOKEN` 和 npm 上的短期 Token，再发布一个新版本（例如 `1.0.3`）以完成 OIDC 验证。之后打版本 tag 即可自动发布：
 
 ```bash
-git tag v1.0.2
-git push origin v1.0.2
+git tag v1.0.3
+git push origin v1.0.3
 ```
 
 > 注意：主包、平台包及主包的 `optionalDependencies` 版本号必须保持一致；工作流会以 tag 中 `v` 后面的版本号统一设置。npm 不允许覆盖已发布的同版本内容。
