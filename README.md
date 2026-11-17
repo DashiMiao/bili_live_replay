@@ -132,7 +132,7 @@ bili_live_replay --version
 1. 注册 npm 账号 `miaodashi` 并开启 2FA；
 2. 创建一个短期 Granular Access Token，赋予 `@miaodashi` 作用域读写权限并开启 Bypass 2FA；
 3. 把 Token 存到 GitHub 仓库的 Secret `NPM_TOKEN`；
-4. 在 GitHub Actions 手动运行 `publish`，输入版本号，例如 `1.0.0`。
+4. 在 GitHub Actions 手动运行 `publish`，输入版本号，例如 `1.0.1`。
 
 首次发布成功后，在 npm 上分别打开主包和 4 个平台包的 Settings → Trusted Publishing，每个包都配置：
 
