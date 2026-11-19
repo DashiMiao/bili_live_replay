@@ -60,7 +60,7 @@ Linux 预编译二进制要求 **x86_64 架构 + glibc ≥ 2.38**（从 1.0.3 �
 > - WSL2 按里面装的发行版判断（如 Ubuntu 24.04 ✅、Ubuntu 22.04 ❌）；Docker / Podman 请选 glibc ≥ 2.38 的基础镜像（如 `ubuntu:24.04`、`debian:13`）。
 > - 查看自己的系统：`uname -m` 看架构（`x86_64` / `aarch64`），`ldd --version | head -1` 看 glibc 版本。
 
-**源码运行 / 自行打包**：Linux、macOS、Windows 都支持（包括上表中 ❌ 的系统：旧版本发行版、Alpine、ARM64、32 位等），CPU 架构跟随本机 Python，要求 Python 3.8+ 和 `requests`。`build.py` 只能打包当前运行平台的产物，不支持交叉编译。
+**源码运行 / 自行打包**：Linux、macOS、Windows 都支持（包括上表中 ❌ 的系统：旧版本发行版、Alpine、ARM64、32 位等），CPU 架构跟随本机 Python。源码运行要求 Python 3.8+ 和 `requests`；自行打包（`build.py` + PyInstaller）要求 Python 3.10+。`build.py` 只能打包当前运行平台的产物，不支持交叉编译。
 
 ```bash
 # Debian / Ubuntu / Linux Mint / Pop!_OS
@@ -75,14 +75,16 @@ sudo zypper install python3 python3-requests
 sudo apk add python3 py3-requests ffmpeg
 ```
 
-**工具自动下载的架构支持**（系统里找不到 ffmpeg / aria2c 时）：
+**工具准备方式**（系统里找不到 ffmpeg / aria2c 时）：
 
 | 工具 | Linux | macOS | Windows |
 |------|-------|-------|---------|
-| ffmpeg | x86_64 / arm64（glibc 发行版） | Intel / Apple Silicon | x64 |
-| aria2c | 不自动下载（建议 `sudo apt install aria2`，否则回退 Python 多线程） | Intel / Apple Silicon | x64 |
+| ffmpeg | 固定版本 7.0.2，x86_64 / arm64，SHA256 校验 | 请用 `brew install ffmpeg`（不自动下载） | 固定版本 8.1.2，x64，SHA256 校验 |
+| aria2c | 不自动下载（建议 `sudo apt install aria2`，否则回退 Python 多线程） | 固定版本 1.37.0，Intel / Apple Silicon，SHA256 校验 | 固定版本 1.37.0，x64，SHA256 校验 |
 
-> Linux 上 ffmpeg 会优先尝试从 apt 源下载（x86_64），失败再回退到 johnvansickle 的静态包。
+> 自动下载只使用固定版本和固定 SHA256：先校验压缩包，再校验解压出的二进制，任何一步失败都不会执行。
+> 下载目录为 `~/.cache/bili-live-replay/tools`（0700）；系统 PATH 里已有 ffmpeg/aria2c 时优先使用系统版本。
+> 程序拒绝以 root/sudo 运行，也拒绝从组/其他用户可写目录执行工具。
 
 ### 方式一：直接跑源码（通用）
 
@@ -109,27 +111,35 @@ python3 build.py
 |------|-------|-------|---------|
 | Python | `sudo apt install python3` | `brew install python` | 官网下载安装包 |
 | requests | `pip3 install requests` | 同左 | 同左 |
-| ffmpeg | 脚本自动下载 | 脚本自动下载 | 脚本自动下载 |
-| aria2c（可选） | `sudo apt install aria2` | `brew install aria2` | `winget install aria2` |
+| ffmpeg | 优先 `sudo apt install ffmpeg`；否则下载固定版本并校验 SHA256 | `brew install ffmpeg`（不自动下载） | 优先 `winget install Gyan.FFmpeg`；否则下载固定版本并校验 SHA256 |
+| aria2c（可选） | `sudo apt install aria2`（不自动下载） | 自动下载固定版本并校验 SHA256，或 `brew install aria2` | 自动下载固定版本并校验 SHA256，或 `winget install aria2` |
 
-> **ffmpeg 自动下载**：脚本会在系统里找不到 ffmpeg 时，按平台自动下载静态 ffmpeg 到「程序同目录下的 `tools/`」（Linux 用 apt 源、失败回退 johnvansickle；macOS 用 evermeet.cx；Windows 用 gyan.dev）。下载优先用 aria2c 多连接加速，没有 aria2c 时用 requests 单线程并显示进度。
-> **aria2c 自动下载**：Windows / macOS 上找不到 aria2c 时会自动下载静态 aria2c 到 `tools/`（Windows 用官方包，macOS 用第三方静态包 `AEPKILL/aria2c-binary`，自动区分 Intel / Apple Silicon）；下载失败或 Linux 上找不到时，自动回退为 Python 多线程下载（慢一点，但能用）。
-> 下载的工具二进制优先放在程序旁边的 `tools/` 目录里，方便连同程序一起拷贝到别的机器；如果程序目录不可写（例如用 `npm install -g` 装到 `/usr/local/lib` 或 Windows 的 `Program Files`），会自动回退到用户缓存目录 `~/.cache/bili-live-replay/tools/`。
+> **工具安全**：所有自动下载都固定版本 + 固定 SHA256，校验失败不会解压或执行；下载只允许 HTTPS 和官方来源。
+> **存放位置**：工具只放在用户私有缓存目录 `~/.cache/bili-live-replay/tools/`（0700），不再放到程序目录。
+> **不要用 sudo 运行**：程序会拒绝 root；如确需 root，请自行确保程序目录和工具目录均为 root-owned 且普通用户不可写。
+> **macOS 的 ffmpeg**：为了避免不可验证的第三方静态包，macOS 不自动下载 ffmpeg，请用 Homebrew 安装。
 
 ## 用法
 
 ```bash
+# 推荐：Cookie 文件只给当前用户读写
+chmod 600 cookie.txt
+
 # 单个日期
 bili_live_replay --room-id 9308312 --cookie-file cookie.txt 2026-11-10
 
-# 多个日期
-bili_live_replay --room-id 9308312 --cookie "$COOKIE" 2026-11-10 2026-11-11
+# 多个日期（从 stdin 读取，不进入 shell 历史/进程列表）
+printf '%s' "$SESSDATA" | bili_live_replay --room-id 9308312 --cookie-stdin 2026-11-10 2026-11-11
 
 # 指定输出目录
-bili_live_replay --room-id 9308312 --cookie "$COOKIE" --out-dir ~/下载 2026-11-10
+bili_live_replay --room-id 9308312 --cookie-file cookie.txt --out-dir ~/下载 2026-11-10
 
 # 一键下载最近 N 场回放（自动跳过没开播的日期）
 bili_live_replay --room-id 9308312 --cookie-file cookie.txt --recent 3
+
+# 追加自定义 CDN 域名（默认只允许 B 站常见 CDN 域名）
+bili_live_replay --room-id 9308312 --cookie-file cookie.txt \
+  --cdn-host example-cdn.com 2026-11-10
 ```
 
 ### 参数说明
@@ -138,14 +148,46 @@ bili_live_replay --room-id 9308312 --cookie-file cookie.txt --recent 3
 |------|------|
 | `dates`（位置参数） | 要下载的日期，格式 `YYYY-MM-DD`，可多个 |
 | `--room-id` | 直播间房间号（必填） |
-| `--cookie` | Cookie 字符串 |
-| `--cookie-file` | 从文件读取 Cookie（与 `--cookie` 二选一） |
+| `--cookie` | **已废弃**：Cookie 字符串会暴露在进程列表/shell 历史；请改用 `--cookie-file`/`--cookie-stdin` |
+| `--cookie-file` | 从文件读取 Cookie（建议 `chmod 600`；组/其他用户可读会直接拒绝） |
+| `--cookie-stdin` | 从标准输入读取 Cookie |
 | `--out-dir` | 输出目录，默认当前目录 |
-| `--part-seconds` | 每个片段时长（秒），默认 3600（1 小时） |
+| `--part-seconds` | 每个片段时长（秒，必须为正整数），默认 3600（1 小时） |
 | `--live-uid` | 主播 uid（可选，跳过房间号解析） |
-| `--keep-temp` | 保留临时分片（默认自动清理） |
-| `--recent N` | 下载最近 N 场回放（与日期列表二选一） |
+| `--keep-temp` | 保留临时视频分片（默认自动清理；aria2c 日志/输入文件始终清理） |
+| `--recent N` | 下载最近 N 场回放（与日期列表二选一，最多 1000） |
 | `--proxy URL` | 指定代理（如 `http://127.0.0.1:7890`）；默认直连、自动绕过系统代理 |
+| `--cdn-host HOST` | 追加允许的 CDN 域名后缀（可重复；默认只允许 B 站常见 CDN） |
+
+## 版本检查与自动更新
+
+正常运行时（`--help` / `--version` 除外）会先检查 npm 上的最新版本：
+
+```text
+npm registry: @miaodashi/bili_live_replay
+```
+
+如果当前版本较旧：
+
+- **源码运行**：仅当仓库干净时执行 `git pull --ff-only`，然后重新启动；有本地修改则拒绝运行。
+- **npm 安装版（Linux / macOS）**：优先 `npm install ... --ignore-scripts`；失败则下载平台包，校验 npm `dist.integrity` 和包内 `SHA256SUMS` 后原子替换二进制并重启。
+- **单文件 PyInstaller 二进制（Linux / macOS）**：下载平台包并校验后原子替换当前可执行文件并重启。
+- **Windows**：npm 安装版会尝试 `npm install ... --ignore-scripts`；单文件版受 Windows 文件锁限制，会自动下载并校验新文件，但可能需要关闭程序后手动替换。
+- **更新失败**：直接退出，不再继续运行旧版本。
+
+默认是**强制在线检查**：每次启动都必须能访问 npm registry；离线、registry 不可达、或无法确认最新版本时会直接退出，缓存不能绕过。
+
+如确需离线运行（会使用缓存，可能继续使用旧版本，风险自负）：
+
+```bash
+export BILI_ALLOW_OFFLINE=1
+```
+
+版本检查结果仍会缓存 1 小时，但缓存只用于显式允许离线时的回退。`BILI_STRICT_UPDATE=0` 是允许离线的旧别名，建议使用 `BILI_ALLOW_OFFLINE=1`。
+
+> 1.0.3 及更早版本不包含此逻辑；必须手动升级到 1.1.0，之后才会开始强制检查和自动更新。
+
+自动更新信任 npm registry 的 TLS + `dist.integrity` + 平台包内 `SHA256SUMS`。如果 npm 发布账号被攻破，仍可能发布恶意版本；对供应链安全要求最高的环境，建议固定版本或使用系统包管理器。
 
 ## 输出与命名
 
@@ -193,10 +235,22 @@ bili_live_replay --room-id 9308312 --cookie-file cookie.txt --recent 3
 ## 说明
 
 - 下载他人直播间回放，需要你的账号已获得该主播的「剪辑权限（授权）」，否则接口返回 `301 没有剪辑权限`。
-- Cookie 只需要 `SESSDATA` 即可登录；若从浏览器复制的 Cookie 是 URL 编码过的（含 `%2C`、`%2A` 等），脚本会自动尝试解码后登录。
+- 只需要 `SESSDATA` 即可登录。程序会从完整 Cookie 中**只提取 SESSDATA**，不会把 `bili_jct` 等其它字段发送给 B 站接口或任何第三方。
+- Cookie 只放在 API 会话的 cookie jar 中，作用域限制为 `.bilibili.com`；m3u8 和分片请求不携带 Cookie。
 - 接口最多返回近 14 天的回放。
 - 下载过程中按 `Ctrl+C` 可立即中断（会自动结束 aria2c 子进程并清理临时文件）。
 - 默认直连下载（绕过系统代理）；若开了代理/梯子导致问题，默认已不受影响，如确需走代理用 `--proxy` 指定。
+- **不要以 root/sudo 运行本工具**；程序会直接拒绝 root。
+- **不要把 Cookie 提交到 git**；`cookie.txt`、`*.cookie`、`.env` 已加入 `.gitignore`。
+- `--keep-temp` 只保留视频分片；含签名 URL 的 aria2c 日志/输入文件始终会删除。
+
+## 安全
+
+- 建议使用 `--cookie-file`（`chmod 600`）或 `--cookie-stdin`，不要使用已废弃的 `--cookie`。
+- 工具下载固定版本 + 固定 SHA256，校验失败不会执行；下载来源只允许 HTTPS 和官方域名。
+- 仓库包含 Gitleaks 配置和 pre-commit hook，CI 会扫描新增变更；也建议在 GitHub 仓库设置中开启 Secret scanning + Push protection。
+- 如果你曾在任何提交中放入过 `cookie.txt`：请立即在 B 站「退出所有设备」并修改密码，然后清理 git 历史（删除文件本身不够）。撤销凭据永远优先于清理历史。
+- 发现安全问题请不要在公开 issue 中粘贴 Cookie、`SESSDATA`、`bili_jct` 或完整日志；请先撤销凭据再联系维护者。
 
 ## 发布到 npm
 
@@ -213,14 +267,9 @@ bili_live_replay --version
 - `npm/{linux-x64,darwin-x64,darwin-arm64,win32-x64}/`：各平台的 PyInstaller 产物包，靠 `os`/`cpu` 字段让 npm 按平台自动选装；
 - `.github/workflows/publish.yml`：`push tag v*`（或手动触发）时编译并发布。
 
-包使用 npm 作用域 `@miaodashi`。首次发布时，这 5 个包在 npm 上尚不存在，需要先完成一次引导发布：
+包使用 npm 作用域 `@miaodashi`。发布使用 **npm Trusted Publishing / OIDC**，工作流中不再使用长期 `NPM_TOKEN`。
 
-1. 注册 npm 账号 `miaodashi` 并开启 2FA；
-2. 创建一个短期 Granular Access Token，赋予 `@miaodashi` 作用域读写权限并开启 Bypass 2FA；
-3. 把 Token 存到 GitHub 仓库的 Secret `NPM_TOKEN`；
-4. 在 GitHub Actions 手动运行 `publish`，输入版本号，例如 `1.0.3`。
-
-首次发布成功后，在 npm 上分别打开主包和 4 个平台包的 Settings → Trusted Publishing，每个包都配置：
+在 npm 上分别打开主包和 4 个平台包的 Settings → Trusted Publishing，每个包都配置：
 
 - Provider：GitHub Actions
 - Organization or user：`DashiMiao`
@@ -228,11 +277,18 @@ bili_live_replay --version
 - Workflow filename：`publish.yml`
 - Allowed actions：允许 `npm publish`
 
-在创建 Trusted Publisher 后的 2 天内，删除 GitHub 中的 `NPM_TOKEN` 和 npm 上的短期 Token，再发布一个新版本（例如 `1.0.3`）以完成 OIDC 验证。之后打版本 tag 即可自动发布：
+配置完成后，在 GitHub Actions 手动运行 `publish` 并输入版本号，或直接打版本 tag：
 
 ```bash
-git tag v1.0.3
-git push origin v1.0.3
+git tag v1.1.0
+git push origin v1.1.0
 ```
 
+工作流会：
+
+- 用 `requirements-build.txt` 固定版本 + `--require-hashes` 安装构建依赖；
+- 生成 `SHA256SUMS`，并用 cosign keyless 签名；
+- 使用 `npm publish --provenance` 发布，并附带校验和/签名文件。
+
 > 注意：主包、平台包及主包的 `optionalDependencies` 版本号必须保持一致；工作流会以 tag 中 `v` 后面的版本号统一设置。npm 不允许覆盖已发布的同版本内容。
+> 如果 Trusted Publisher 尚未配置，可临时在本地手动 `npm publish`；不要把 npm token 写进仓库、README 或 CI 日志。

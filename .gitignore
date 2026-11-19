@@ -6,6 +6,20 @@ build/
 dist/
 *.spec
 
+# 凭据：绝不能提交
+cookie.txt
+cookie*.txt
+*.cookie
+.env
+.env.*
+
+# 下载/构建的工具和校验和（运行时生成，不进仓库）
+tools/
+SHA256SUMS
+SHA256SUMS.sig
+SHA256SUMS.pem
+npm/*/SHA256SUMS
+
 # Node / npm
 node_modules/
 npm-debug.log*
