@@ -59,9 +59,9 @@ class SecurityTests(unittest.TestCase):
         try:
             os.chmod(name, 0o644)
             with self.assertRaises(SystemExit):
-                b.load_cookie("", name, False)
+                b.load_cookie(name, False)
             os.chmod(name, 0o600)
-            self.assertEqual(b.load_cookie("", name, False), "SESSDATA=x")
+            self.assertEqual(b.load_cookie(name, False), "SESSDATA=x")
         finally:
             os.unlink(name)
 

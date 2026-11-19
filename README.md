@@ -148,7 +148,6 @@ bili_live_replay --room-id 9308312 --cookie-file cookie.txt \
 |------|------|
 | `dates`（位置参数） | 要下载的日期，格式 `YYYY-MM-DD`，可多个 |
 | `--room-id` | 直播间房间号（必填） |
-| `--cookie` | **已废弃**：Cookie 字符串会暴露在进程列表/shell 历史；请改用 `--cookie-file`/`--cookie-stdin` |
 | `--cookie-file` | 从文件读取 Cookie（建议 `chmod 600`；组/其他用户可读会直接拒绝） |
 | `--cookie-stdin` | 从标准输入读取 Cookie |
 | `--out-dir` | 输出目录，默认当前目录 |
@@ -246,7 +245,7 @@ export BILI_ALLOW_OFFLINE=1
 
 ## 安全
 
-- 建议使用 `--cookie-file`（`chmod 600`）或 `--cookie-stdin`，不要使用已废弃的 `--cookie`。
+- 建议使用 `--cookie-file`（`chmod 600`）或 `--cookie-stdin`。
 - 工具下载固定版本 + 固定 SHA256，校验失败不会执行；下载来源只允许 HTTPS 和官方域名。
 - 仓库包含 Gitleaks 配置和 pre-commit hook，CI 会扫描新增变更；也建议在 GitHub 仓库设置中开启 Secret scanning + Push protection。
 - 如果你曾在任何提交中放入过 `cookie.txt`：请立即在 B 站「退出所有设备」并修改密码，然后清理 git 历史（删除文件本身不够）。撤销凭据永远优先于清理历史。
@@ -269,13 +268,24 @@ bili_live_replay --version
 
 包使用 npm 作用域 `@miaodashi`。发布使用 **npm Trusted Publishing / OIDC**，工作流中不再使用长期 `NPM_TOKEN`。
 
-在 npm 上分别打开主包和 4 个平台包的 Settings → Trusted Publishing，每个包都配置：
+在 npm 上分别打开主包和 4 个平台包的 **Settings → Trusted publishing**，每个包都配置：
 
 - Provider：GitHub Actions
-- Organization or user：`DashiMiao`
+- Organization or user：`DashiMiao`（大小写必须完全一致）
 - Repository：`bili_live_replay`
-- Workflow filename：`publish.yml`
-- Allowed actions：允许 `npm publish`
+- Workflow filename：`publish.yml`（只填文件名，必须带 `.yml`；大小写敏感）
+- Environment name：留空（工作流没有使用 environment）
+- Allowed actions：**必须勾选 `npm publish`**；`npm stage publish` 默认允许，但 2026-09-03 之后创建的配置默认不允许直接 `npm publish`
+
+注意事项：
+
+- 5 个包必须**分别**配置；只配置主包会导致平台包发布时返回 404。
+- Trusted Publisher 配置创建后必须 **2 天内完成首次成功发布**，否则会过期；过期后不能修改，只能删除重建。
+- 配置创建后字段不可修改；写错了要删除后重建。
+- 工作流必须运行在 GitHub 托管的 runner 上（本项目用的是 `ubuntu-latest` / `macos-*` / `windows-latest`），不支持 self-hosted runner。
+- 需要 npm CLI ≥ 11.5.1、Node ≥ 22.14；工作流使用 Node 24，满足要求。
+- `package.json` 的 `repository.url` 必须精确匹配 GitHub 仓库；本项目已统一为 `git+https://github.com/DashiMiao/bili_live_replay.git`。
+- Trusted Publishing 验证成功后，建议到每个包的 **Settings → Publishing access** 选择 **Require two-factor authentication and disallow tokens**，彻底关闭长期 token 发布。
 
 配置完成后，在 GitHub Actions 手动运行 `publish` 并输入版本号，或直接打版本 tag：
 
