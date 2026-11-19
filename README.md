@@ -266,9 +266,23 @@ bili_live_replay --version
 - `npm/{linux-x64,darwin-x64,darwin-arm64,win32-x64}/`：各平台的 PyInstaller 产物包，靠 `os`/`cpu` 字段让 npm 按平台自动选装；
 - `.github/workflows/publish.yml`：`push tag v*`（或手动触发）时编译并发布。
 
-包使用 npm 作用域 `@miaodashi`。发布使用 **npm Trusted Publishing / OIDC**，工作流中不再使用长期 `NPM_TOKEN`。
+包使用 npm 作用域 `@miaodashi`。
 
-在 npm 上分别打开主包和 4 个平台包的 **Settings → Trusted publishing**，每个包都配置：
+### 当前 1.x：NPM_TOKEN
+
+1.x 暂时使用 **NPM_TOKEN** 发布：
+
+1. npm → Access Tokens → 创建 Granular Access Token：
+   - 权限：`@miaodashi` 读写
+   - 需要时开启 Bypass 2FA（短期使用）
+2. GitHub 仓库 → Settings → Secrets and variables → Actions → 新建 `NPM_TOKEN`
+3. 工作流使用 `NODE_AUTH_TOKEN` + `npm publish --access public`
+
+当前 1.x 仍会生成 `SHA256SUMS` 并放进各平台包，但不使用 cosign/provenance；这些会在 2.0.0 恢复。
+
+### 2.0.0：切回 Trusted Publishing
+
+到 2.0.0 时，删除 `publish.yml` 里的 `NODE_AUTH_TOKEN`，恢复 `id-token: write`、cosign 和 `npm publish --provenance`，然后在 npm 上分别打开主包和 4 个平台包的 **Settings → Trusted publishing**，每个包都配置：
 
 - Provider：GitHub Actions
 - Organization or user：`DashiMiao`（大小写必须完全一致）
@@ -297,8 +311,8 @@ git push origin v1.1.0
 工作流会：
 
 - 用 `requirements-build.txt` 固定版本 + `--require-hashes` 安装构建依赖；
-- 生成 `SHA256SUMS`，并用 cosign keyless 签名；
-- 使用 `npm publish --provenance` 发布，并附带校验和/签名文件。
+- 生成 `SHA256SUMS` 并放进各平台包；
+- 1.x 使用 `NPM_TOKEN` + `npm publish --access public`；2.0.0 恢复 cosign 签名和 `npm publish --provenance`。
 
 > 注意：主包、平台包及主包的 `optionalDependencies` 版本号必须保持一致；工作流会以 tag 中 `v` 后面的版本号统一设置。npm 不允许覆盖已发布的同版本内容。
-> 如果 Trusted Publisher 尚未配置，可临时在本地手动 `npm publish`；不要把 npm token 写进仓库、README 或 CI 日志。
+> 不要把 npm token 写进仓库、README 或 CI 日志；只放在 GitHub Actions Secret 里。
