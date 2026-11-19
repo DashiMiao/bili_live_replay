@@ -7,9 +7,7 @@
   },
   "files": [
     "bin",
-    "SHA256SUMS",
-    "SHA256SUMS.sig",
-    "SHA256SUMS.pem"
+    "SHA256SUMS"
   ],
   "optionalDependencies": {
     "@miaodashi/bili_live_replay-linux-x64": "1.1.0",

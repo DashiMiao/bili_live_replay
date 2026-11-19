@@ -88,9 +88,9 @@ jobs:
   publish:
     needs: build
     runs-on: ubuntu-latest
+    # 1.x 暂时使用 NPM_TOKEN 发布；2.0.0 再切回 Trusted Publishing/OIDC。
     permissions:
       contents: read
-      id-token: write
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -128,6 +128,7 @@ jobs:
             ( cd "npm/$pkg" && sha256sum bin/bili_live_replay > SHA256SUMS )
           done
           ( cd npm/win32-x64 && sha256sum bin/bili_live_replay.exe > SHA256SUMS )
+          cp SHA256SUMS npm/bili_live_replay/SHA256SUMS
 
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
@@ -158,19 +159,6 @@ jobs:
             "optionalDependencies.@miaodashi/bili_live_replay-win32-x64=$VERSION"
           cp README.md npm/bili_live_replay/README.md
 
-      - name: 安装 cosign
-        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
-
-      - name: 签名 SHA256SUMS（keyless）
-        shell: bash
-        run: |
-          set -euo pipefail
-          cosign sign-blob --yes \
-            --output-signature SHA256SUMS.sig \
-            --output-certificate SHA256SUMS.pem \
-            SHA256SUMS
-          cp SHA256SUMS SHA256SUMS.sig SHA256SUMS.pem npm/bili_live_replay/
-
       - name: 检查待发布内容
         shell: bash
         run: |
@@ -180,9 +168,16 @@ jobs:
           done
 
       - name: 发布到 npm
+        env:
+          # 1.x 临时使用 NPM_TOKEN；2.0.0 切回 Trusted Publishing/OIDC 后删除。
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "缺少 NPM_TOKEN secret：请在 GitHub Actions Secrets 中添加 NPM_TOKEN"
+            exit 1
+          fi
           echo "发布版本: $VERSION"
 
           publish_if_missing() {
@@ -191,8 +186,7 @@ jobs:
             if npm view "$name@$VERSION" version >/dev/null 2>&1; then
               echo "$name@$VERSION 已存在，跳过"
             else
-              # npm Trusted Publishing / OIDC：不再使用长期 NPM_TOKEN
-              ( cd "$dir" && npm publish --access public --provenance )
+              ( cd "$dir" && npm publish --access public )
             fi
           }
 
