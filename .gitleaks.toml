@@ -9,11 +9,6 @@ useDefault = true
 paths = [
   '''requirements-build\.txt''',
 ]
-# 已知的历史 cookie.txt 泄露（提交 a9fd6ad）。这是临时放行，
-# 清理 git 历史后必须删除；新提交中的同类泄露仍会被拦截。
-commits = [
-  "a9fd6ad367a252edac4ad9134c24014588484268",
-]
 
 [[rules]]
 id = "bilibili-sessdata"

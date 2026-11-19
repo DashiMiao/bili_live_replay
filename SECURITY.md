@@ -26,7 +26,7 @@
    删除文件本身不够；旧提交仍然可以 `git show` 出来。
 4. GitHub 可能缓存旧提交，必要时联系 GitHub Support；fork/clone 仍可能保留旧内容。
 5. **撤销凭据永远优先于清理历史**，不要指望删历史让已泄露的 Cookie 失效。
-6. CI 目前对已知历史提交 `a9fd6ad367a252edac4ad9134c24014588484268` 做了临时 Gitleaks 放行；它不会让 Cookie 失效，清理历史后必须删除 `.gitleaks.toml` 中的该 `commits` 项。
+6. 本仓库历史中的 `cookie.txt` 已用 `git filter-repo` 清理，`.gitleaks.toml` 中对旧提交的临时放行也已移除。若再次发现泄露，请按上述流程处理，并重新检查 Gitleaks 告警。
 
 ## 本仓库的凭据规则
 
