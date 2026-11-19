@@ -27,8 +27,7 @@ bilibili 直播回放下载工具
     否则接口会返回 301「没有剪辑权限」。
   - 只需要 SESSDATA 即可登录；程序会从完整 Cookie 中只提取 SESSDATA，
     不会把 bili_jct 等其它字段发送给任何第三方。
-  - Cookie 文件请使用 chmod 600；请勿提交到 git，也不要使用 --cookie
-    （它会暴露在进程列表和 shell 历史中）。
+  - Cookie 文件请使用 chmod 600；请勿提交到 git。
 """
 
 import argparse
@@ -726,7 +725,6 @@ STRINGS = {
         "dates_help": "日期列表，格式 YYYY-MM-DD（与 --recent 二选一）",
         "dates_metavar": "日期",
         "room_id_help": "直播间房间号",
-        "cookie_help": "已废弃：Cookie 字符串会暴露在进程列表，请改用 --cookie-file/--cookie-stdin",
         "cookie_file_help": "从文件读取 Cookie（建议 chmod 600）",
         "cookie_stdin_help": "从标准输入读取 Cookie",
         "cdn_host_help": "追加允许的 CDN 域名后缀（可重复，例如 example.com）",
@@ -752,7 +750,6 @@ STRINGS = {
         "dates_help": "date list, format YYYY-MM-DD (mutually exclusive with --recent)",
         "dates_metavar": "DATE",
         "room_id_help": "live room id",
-        "cookie_help": "deprecated: cookie string is visible in process list; use --cookie-file/--cookie-stdin",
         "cookie_file_help": "read cookie from file (chmod 600 recommended)",
         "cookie_stdin_help": "read cookie from stdin",
         "cdn_host_help": "extra allowed CDN host suffix (repeatable, e.g. example.com)",
@@ -889,13 +886,9 @@ def http_get(session, url, params=None, headers=None, timeout=30):
 # --------------------------------------------------------------------------- #
 # Cookie 处理：只提取 SESSDATA，并尽量用 URL 解码后的值登录
 # --------------------------------------------------------------------------- #
-def load_cookie(cookie_str: str, cookie_file: str, cookie_stdin: bool) -> str:
-    if sum(bool(x) for x in (cookie_str, cookie_file, cookie_stdin)) > 1:
-        sys.exit("--cookie / --cookie-file / --cookie-stdin 只能选择一个")
-    if cookie_str:
-        warn("--cookie 已废弃：Cookie 会暴露在进程列表/shell 历史中，"
-             "建议改用 --cookie-file 或 --cookie-stdin")
-        return cookie_str.strip()
+def load_cookie(cookie_file: str, cookie_stdin: bool) -> str:
+    if cookie_file and cookie_stdin:
+        sys.exit("--cookie-file / --cookie-stdin 只能选择一个")
     if cookie_file:
         p = Path(cookie_file)
         if not p.exists() or not p.is_file():
@@ -914,7 +907,7 @@ def load_cookie(cookie_str: str, cookie_file: str, cookie_stdin: bool) -> str:
             sys.exit(f"无法读取 Cookie 文件: {e}")
     if cookie_stdin:
         return sys.stdin.read().strip()
-    sys.exit("必须提供 Cookie：--cookie-file 或 --cookie-stdin（--cookie 已废弃）")
+    sys.exit("必须提供 Cookie：--cookie-file 或 --cookie-stdin")
 
 
 def extract_sessdata(raw: str) -> str:
@@ -1787,7 +1780,6 @@ def main():
     ap = LocalizedArgumentParser(S, description=S["description"])
     ap.add_argument("dates", nargs="*", metavar=S["dates_metavar"], help=S["dates_help"])
     ap.add_argument("--room-id", type=int, required=True, help=S["room_id_help"])
-    ap.add_argument("--cookie", default="", help=S["cookie_help"])
     ap.add_argument("--cookie-file", default="", help=S["cookie_file_help"])
     ap.add_argument("--cookie-stdin", action="store_true", help=S["cookie_stdin_help"])
     ap.add_argument("--out-dir", default=".", help=S["out_dir_help"])
@@ -1853,7 +1845,7 @@ def main():
     outdir.mkdir(parents=True, exist_ok=True)
 
     # Cookie：只保留 SESSDATA，其它字段（包括 bili_jct）立即丢弃
-    raw_cookie = load_cookie(args.cookie, args.cookie_file, args.cookie_stdin)
+    raw_cookie = load_cookie(args.cookie_file, args.cookie_stdin)
     sessdata = extract_sessdata(raw_cookie)
     del raw_cookie
     sessdata = resolve_sessdata(sessdata)
