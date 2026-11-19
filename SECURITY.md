@@ -30,7 +30,7 @@
 
 ## 本仓库的凭据规则
 
-- 只使用 `--cookie-file`（`chmod 600`）或 `--cookie-stdin`；`--cookie` 已废弃。
+- 只使用 `--cookie-file`（`chmod 600`）或 `--cookie-stdin`。
 - 程序只提取 `SESSDATA`，不会把 `bili_jct` 等其它 Cookie 发给第三方。
 - `cookie.txt`、`*.cookie`、`.env` 已在 `.gitignore` 中。
 - 仓库包含 Gitleaks 配置和 pre-commit hook；请在 GitHub 仓库设置中开启 Secret scanning + Push protection。
