@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "要发布的版本号（例如 1.0.3）"
+        description: "要发布的版本号（例如 1.1.0）"
         required: true
-        default: "1.0.3"
+        default: "1.1.0"
 
 jobs:
   # 1) 在各平台用 PyInstaller 编译出原生二进制，作为 artifact 暂存
@@ -32,13 +32,29 @@ jobs:
             pkg: win32-x64
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           # 3.14 起 argparse 的 --help 会自带彩色输出；用 3.12 打包出来的二进制
           # 在终端里没有颜色，和本地运行的观感不一致。
           python-version: "3.14"
+
+      - name: 校验 VERSION 与发布版本一致
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ github.event.inputs.version }}"
+          if [ -z "$VERSION" ]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          SRC_VERSION=$(sed -n 's/^VERSION = "\(.*\)"/\1/p' bili_live_replay.py)
+          if [ "$SRC_VERSION" != "$VERSION" ]; then
+            echo "VERSION 不一致：源码=$SRC_VERSION 发布=$VERSION"
+            exit 1
+          fi
 
       - name: 编译二进制
         env:
@@ -56,8 +72,13 @@ jobs:
             cp dist/bili_live_replay "bili_live_replay-${{ matrix.pkg }}"
           fi
 
+      - name: 生成 SHA256
+        shell: bash
+        run: |
+          python -c "import hashlib,pathlib; [p.with_name(p.name+'.sha256').write_text(hashlib.sha256(p.read_bytes()).hexdigest()+'  '+p.name+'\n', encoding='utf-8') for p in pathlib.Path('.').glob('bili_live_replay-*') if p.suffix != '.sha256']"
+
       - name: 上传 artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: bin-${{ matrix.pkg }}
           path: bili_live_replay-${{ matrix.pkg }}*
@@ -71,10 +92,12 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
 
       - name: 下载所有平台二进制
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           pattern: bin-*
           merge-multiple: true
@@ -93,7 +116,20 @@ jobs:
                    npm/darwin-x64/bin/bili_live_replay \
                    npm/darwin-arm64/bin/bili_live_replay
 
-      - uses: actions/setup-node@v6
+      - name: 生成 SHA256 校验和
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha256sum npm/linux-x64/bin/bili_live_replay \
+                    npm/darwin-x64/bin/bili_live_replay \
+                    npm/darwin-arm64/bin/bili_live_replay \
+                    npm/win32-x64/bin/bili_live_replay.exe > SHA256SUMS
+          for pkg in linux-x64 darwin-x64 darwin-arm64; do
+            ( cd "npm/$pkg" && sha256sum bin/bili_live_replay > SHA256SUMS )
+          done
+          ( cd npm/win32-x64 && sha256sum bin/bili_live_replay.exe > SHA256SUMS )
+
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
@@ -122,6 +158,19 @@ jobs:
             "optionalDependencies.@miaodashi/bili_live_replay-win32-x64=$VERSION"
           cp README.md npm/bili_live_replay/README.md
 
+      - name: 安装 cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+
+      - name: 签名 SHA256SUMS（keyless）
+        shell: bash
+        run: |
+          set -euo pipefail
+          cosign sign-blob --yes \
+            --output-signature SHA256SUMS.sig \
+            --output-certificate SHA256SUMS.pem \
+            SHA256SUMS
+          cp SHA256SUMS SHA256SUMS.sig SHA256SUMS.pem npm/bili_live_replay/
+
       - name: 检查待发布内容
         shell: bash
         run: |
@@ -131,9 +180,6 @@ jobs:
           done
 
       - name: 发布到 npm
-        env:
-          # 仅首次创建这 5 个包时需要 NPM_TOKEN；之后由 npm Trusted Publishing/OIDC 认证。
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
@@ -145,7 +191,8 @@ jobs:
             if npm view "$name@$VERSION" version >/dev/null 2>&1; then
               echo "$name@$VERSION 已存在，跳过"
             else
-              ( cd "$dir" && npm publish --access public )
+              # npm Trusted Publishing / OIDC：不再使用长期 NPM_TOKEN
+              ( cd "$dir" && npm publish --access public --provenance )
             fi
           }
 

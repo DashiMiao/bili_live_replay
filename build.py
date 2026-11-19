@@ -19,6 +19,9 @@ import sys
 import venv
 from pathlib import Path
 
+if sys.version_info < (3, 10):
+    raise SystemExit("build.py 需要 Python 3.10+（仅运行源码仍支持 Python 3.8+）。")
+
 # Windows CI（如 GitHub Actions）默认用 cp1252 输出，打印中文会抛 UnicodeEncodeError，
 # 这里强制把标准输出/错误切换为 UTF-8，保证各平台都能正常打印中文。
 for _stream in (sys.stdout, sys.stderr):
@@ -49,8 +52,13 @@ def main():
         print("创建虚拟环境 ...", flush=True)
         venv.create(VENV, with_pip=True)
 
-    print("安装打包依赖（PyInstaller / requests）...", flush=True)
-    run([str(py), "-m", "pip", "install", "--upgrade", "pyinstaller", "requests"])
+    req = BASE / "requirements-build.txt"
+    if not req.exists():
+        raise SystemExit(f"缺少构建依赖锁文件: {req}")
+    print("安装打包依赖（固定版本 + --require-hashes）...", flush=True)
+    run([str(py), "-m", "pip", "install",
+         "--require-hashes", "--only-binary=:all:",
+         "-r", str(req)])
 
     print("开始打包 ...", flush=True)
     run([str(py), "-m", "PyInstaller", "--onefile", "--name", "bili_live_replay",

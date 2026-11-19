@@ -1,18 +1,21 @@
 {
   "name": "@miaodashi/bili_live_replay",
-  "version": "1.0.3",
+  "version": "1.1.0",
   "description": "bilibili 直播回放下载工具（跨平台 CLI，npm 版）",
   "bin": {
     "bili_live_replay": "bin/bili_live_replay.js"
   },
   "files": [
-    "bin"
+    "bin",
+    "SHA256SUMS",
+    "SHA256SUMS.sig",
+    "SHA256SUMS.pem"
   ],
   "optionalDependencies": {
-    "@miaodashi/bili_live_replay-linux-x64": "1.0.3",
-    "@miaodashi/bili_live_replay-darwin-x64": "1.0.3",
-    "@miaodashi/bili_live_replay-darwin-arm64": "1.0.3",
-    "@miaodashi/bili_live_replay-win32-x64": "1.0.3"
+    "@miaodashi/bili_live_replay-linux-x64": "1.1.0",
+    "@miaodashi/bili_live_replay-darwin-x64": "1.1.0",
+    "@miaodashi/bili_live_replay-darwin-arm64": "1.1.0",
+    "@miaodashi/bili_live_replay-win32-x64": "1.1.0"
   },
   "repository": {
     "type": "git",
