@@ -313,8 +313,8 @@ bili_live_replay --version
 配置完成后，在 GitHub Actions 手动运行 `publish` 并输入版本号，或直接打版本 tag：
 
 ```bash
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.1.1
+git push origin v1.1.1
 ```
 
 工作流会：

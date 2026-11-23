@@ -67,7 +67,7 @@ API_SESSION = "https://api.live.bilibili.com/xlive/web-room/v1/videoService/GetU
 API_ROOM = "https://api.live.bilibili.com/room/v1/Room/get_info"
 API_NAV = "https://api.bilibili.com/x/web-interface/nav"
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 AUTHOR = "dashimiao"
 
 
