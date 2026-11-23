@@ -192,6 +192,7 @@ export BILI_ALLOW_OFFLINE=1
 
 - 文件名：`yyyy_mm_dd_partN.mp4`，`N` 从 1 开始。
 - 每小时一个片段，结尾不足 1 小时的单独成一个片段。
+- 同一天有多场直播时，按开始时间从早到晚命名为 `yyyy_mm_dd_1_partN.mp4`、`yyyy_mm_dd_2_partN.mp4`……，不会互相覆盖。
 
 例如：
 
@@ -201,6 +202,14 @@ export BILI_ALLOW_OFFLINE=1
 2026_11_10_part3.mp4
 2026_11_10_part4.mp4
 2026_11_10_part5.mp4   <- 结尾不足 1 小时的余量
+```
+
+如果 2026-11-11 直播了两场：
+
+```
+2026_11_11_1_part1.mp4   <- 第一场（较早）
+2026_11_11_1_part2.mp4
+2026_11_11_2_part1.mp4   <- 第二场（较晚）
 ```
 
 ## 断流处理
@@ -304,8 +313,8 @@ bili_live_replay --version
 配置完成后，在 GitHub Actions 手动运行 `publish` 并输入版本号，或直接打版本 tag：
 
 ```bash
-git tag v1.1.0
-git push origin v1.1.0
+git tag v1.1.1
+git push origin v1.1.1
 ```
 
 工作流会：

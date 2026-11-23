@@ -8,6 +8,7 @@ bilibili 直播回放下载工具
   1. 根据房间号 + 日期，下载指定直播回放；
   2. 每个回放按固定时长（默认 1 小时）切分为独立片段；
   3. 命名规则：yyyy_mm_dd_partN（N 从 1 开始，最后一小时不足的部分单独成段）；
+     同一天有多场直播时，按时间先后命名为 yyyy_mm_dd_1_partN、yyyy_mm_dd_2_partN……；
   4. 若某场直播中途断流（回放被切成多段），自动把断流前后的片段拼接起来；
   5. 视频导出后，在终端中说明断流原因（网络/推流问题 还是 违规封禁）。
 
@@ -66,7 +67,7 @@ API_SESSION = "https://api.live.bilibili.com/xlive/web-room/v1/videoService/GetU
 API_ROOM = "https://api.live.bilibili.com/room/v1/Room/get_info"
 API_NAV = "https://api.bilibili.com/x/web-interface/nav"
 
-VERSION = "1.1.0"
+VERSION = "1.1.1"
 AUTHOR = "dashimiao"
 
 
@@ -988,14 +989,64 @@ def get_replay_list(uid: int, session, referer: str) -> list:
 
 
 def filter_by_dates(replays: list, dates: list) -> dict:
-    """按直播开始时间（CST）筛选回放，返回 {date_str: replay}。"""
+    """按直播开始时间（CST）筛选回放，返回 {date_str: [replay, ...]}。
+
+    同一天有多场直播时全部保留，并按开始时间升序排列。
+    """
     wanted = set(dates)
     result = {}
-    for r in replays:
+    for r in sorted(replays, key=lambda x: x["start_time"]):
         d = fmt_ts(r["start_time"], "%Y-%m-%d")
-        if d in wanted and d not in result:
-            result[d] = r
+        if d in wanted:
+            result.setdefault(d, []).append(r)
     return result
+
+
+def build_replay_plan(replays: list, all_replays: list = None) -> list:
+    """把要下载的回放整理为 [(replay, date_str, prefix), ...]。
+
+    同一天有多场直播时，按开始时间从早到晚依次命名为
+    yyyy_mm_dd_1、yyyy_mm_dd_2……，避免同名产物互相覆盖；
+    当天只有一场时仍保持 yyyy_mm_dd。
+
+    all_replays 用于判断某天总共有几场直播（默认为 replays 自身）；
+    这样即使只下载当天的一部分回放，序号也与当天实际场次一致。
+    """
+    universe = []
+    seen = set()
+    for r in (all_replays if all_replays is not None else replays):
+        rid = r.get("replay_id")
+        if rid is not None:
+            if rid in seen:
+                continue
+            seen.add(rid)
+        universe.append(r)
+
+    by_date = {}
+    for r in universe:
+        d = fmt_ts(r["start_time"], "%Y-%m-%d")
+        by_date.setdefault(d, []).append(r)
+
+    index = {}
+    for group in by_date.values():
+        for i, r in enumerate(sorted(group, key=lambda x: x["start_time"]), 1):
+            if r.get("replay_id") is not None:
+                index[r["replay_id"]] = i
+
+    plan = []
+    seen = set()
+    for r in replays:
+        rid = r.get("replay_id")
+        if rid is not None:
+            if rid in seen:
+                continue
+            seen.add(rid)
+        d = fmt_ts(r["start_time"], "%Y-%m-%d")
+        prefix = d.replace("-", "_")
+        if len(by_date.get(d, ())) > 1:
+            prefix = f"{prefix}_{index.get(rid, 1)}"
+        plan.append((r, d, prefix))
+    return plan
 
 
 # --------------------------------------------------------------------------- #
@@ -1649,6 +1700,7 @@ def process_replay(replay, uid, date_str, prefix, api_session, cdn_session, refe
     log(f"\n{'=' * 60}")
     log(f"日期 {date_str} 回放  replay_id={replay['replay_id']}")
     log(f"  直播时间 {fmt_ts(replay['start_time'])} ~ {fmt_ts(replay['end_time'])}")
+    log(f"  输出命名 {prefix}_partN.mp4")
 
     slices = get_slices(replay, uid, api_session, referer)
     if not slices or not slices["list"]:
@@ -1869,21 +1921,16 @@ def main():
     if args.recent:
         replays_sorted = sorted(replays, key=lambda r: r["start_time"], reverse=True)
         selected = replays_sorted[:args.recent]
-        log(f"选取最近 {len(selected)} 场回放：")
-        for r in selected:
-            log(f"    {fmt_ts(r['start_time'], '%Y-%m-%d %H:%M')} ~ "
-                f"{fmt_ts(r['end_time'], '%H:%M')}")
-        to_process = [(r, fmt_ts(r["start_time"], "%Y-%m-%d"),
-                       fmt_ts(r["start_time"], "%Y_%m_%d")) for r in selected]
     else:
         matched = filter_by_dates(replays, args.dates)
-        to_process = []
+        selected = []
         for d in args.dates:
-            r = matched.get(d)
-            if not r:
+            day_replays = matched.get(d)
+            if not day_replays:
                 warn(f"未找到 {d} 的回放")
                 continue
-            to_process.append((r, d, d.replace("-", "_")))
+            selected.extend(day_replays)
+    to_process = build_replay_plan(selected, replays)
 
     if not to_process:
         log("没有可下载的回放。")
@@ -1891,6 +1938,29 @@ def main():
         api_session.close()
         cdn_session.close()
         return
+
+    if args.recent:
+        log(f"选取最近 {len(to_process)} 场回放：")
+        for r, _d, prefix in to_process:
+            log(f"    {fmt_ts(r['start_time'], '%Y-%m-%d %H:%M')} ~ "
+                f"{fmt_ts(r['end_time'], '%H:%M')}  -> {prefix}_partN.mp4")
+
+    # 同一天有多场直播时给出提示（命名会自动加序号，不会互相覆盖）
+    full_counts = {}
+    seen = set()
+    for r in replays:
+        rid = r.get("replay_id")
+        if rid is not None:
+            if rid in seen:
+                continue
+            seen.add(rid)
+        d = fmt_ts(r["start_time"], "%Y-%m-%d")
+        full_counts[d] = full_counts.get(d, 0) + 1
+    for d in sorted({d for _r, d, _p in to_process}):
+        count = full_counts.get(d, 0)
+        if count > 1:
+            base = d.replace("-", "_")
+            log(f"{d} 当天共有 {count} 场直播，已按开始时间编号（{base}_1 ~ {base}_{count}）")
 
     # ffmpeg：系统包管理器优先，否则只接受固定 SHA256 的版本
     ffmpeg, ffprobe, env = ensure_ffmpeg()
